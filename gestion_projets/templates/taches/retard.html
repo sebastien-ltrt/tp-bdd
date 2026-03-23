@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Tâches en retard — Gestion de Projets{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">
+    <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+    Tâches en retard
+    <span class="badge bg-danger ms-2">{{ retards|length }}</span>
+</h4>
+
+{% if retards %}
+<div class="table-modern">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Tâche</th>
+                    <th>Projet</th>
+                    <th>Assigné</th>
+                    <th class="text-center">Statut</th>
+                    <th class="text-center">Priorité</th>
+                    <th class="text-center">Échéance</th>
+                    <th class="text-center">Retard</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in retards %}
+                <tr>
+                    <td><strong>{{ r.titre }}</strong></td>
+                    <td><small>{{ r.nom_projet }}</small></td>
+                    <td><small>{{ r.assignee_nom }}</small></td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ r.statut|statut_badge }}">{{ r.statut }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ r.priorite|priorite_badge }}">{{ r.priorite }}</span>
+                    </td>
+                    <td class="text-center">
+                        <small class="text-danger">{{ r.date_echeance|datefr }}</small>
+                    </td>
+                    <td class="text-center">
+                        {% if r.jours_retard > 20 %}
+                        <span class="badge bg-danger badge-retard">{{ r.jours_retard|int }} jours</span>
+                        {% elif r.jours_retard > 7 %}
+                        <span class="badge bg-warning text-dark">{{ r.jours_retard|int }} jours</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ r.jours_retard|int }} jours</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" title="Marquer comme...">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    {% for s in ["in_progress", "done", "blocked"] %}
+                                    {% if s != r.statut %}
+                                    <li>
+                                        <form action="{{ url_for('changer_statut_tache', id=r._id) }}" method="post">
+                                            <input type="hidden" name="statut" value="{{ s }}">
+                                            <button class="dropdown-item">
+                                                <span class="badge bg-{{ s|statut_badge }} me-1">{{ s }}</span>
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <a href="{{ url_for('modifier_tache', id=r._id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-check-circle display-1 text-success"></i>
+    <p class="text-muted mt-3 fs-5">Aucune tâche en retard !</p>
+</div>
+{% endif %}
+{% endblock %}

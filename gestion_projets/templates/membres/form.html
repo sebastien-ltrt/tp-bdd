@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ "Modifier" if membre else "Ajouter" }} un membre — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="section-card">
+            <h4 class="fw-bold mb-4">
+                <i class="bi bi-{{ 'pencil' if membre else 'person-plus' }} me-2"></i>
+                {{ "Modifier le membre" if membre else "Nouveau membre" }}
+            </h4>
+
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Prénom</label>
+                        <input type="text" name="prenom" class="form-control" required
+                               value="{{ membre.prenom if membre else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nom</label>
+                        <input type="text" name="nom" class="form-control" required
+                               value="{{ membre.nom if membre else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Email</label>
+                        <input type="email" name="email" class="form-control" required
+                               value="{{ membre.email if membre else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Rôle</label>
+                        <select name="role" class="form-select" required>
+                            {% set roles = ["developpeur", "designer", "chef_projet", "testeur", "devops", "analyste"] %}
+                            {% for r in roles %}
+                            <option value="{{ r }}" {% if membre and membre.role == r %}selected{% endif %}>
+                                {{ r }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Compétences</label>
+                        <input type="text" name="competences" class="form-control"
+                               placeholder="Python, JavaScript, Docker, ..."
+                               value="{{ membre.competences|join(', ') if membre else '' }}">
+                        <small class="text-muted">Séparées par des virgules</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Date d'embauche</label>
+                        <input type="date" name="date_embauche" class="form-control" required
+                               value="{{ membre.date_embauche.strftime('%Y-%m-%d') if membre else '' }}">
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {{ "Enregistrer" if membre else "Ajouter le membre" }}
+                    </button>
+                    <a href="{{ url_for('liste_membres') }}" class="btn btn-outline-secondary">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

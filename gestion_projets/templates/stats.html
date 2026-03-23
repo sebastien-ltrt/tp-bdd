@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Statistiques — Gestion de Projets{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4"><i class="bi bi-bar-chart-line me-2"></i>Statistiques & Agrégations</h4>
+
+<div class="row g-4">
+    <!-- 1. Avancement par projet -->
+    <div class="col-lg-6">
+        <div class="section-card h-100">
+            <h5><i class="bi bi-graph-up text-success"></i> Avancement par projet</h5>
+            {% for a in avancements %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <strong>{{ a.nom_projet }}</strong>
+                    <span>{{ a.pourcentage_avancement }}%</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar bg-success" style="width: {{ a.pourcentage_avancement }}%"></div>
+                </div>
+                <small class="text-muted">
+                    Done: {{ a.taches_terminees }} | En cours: {{ a.taches_en_cours }} |
+                    Todo: {{ a.taches_todo }} | Bloquées: {{ a.taches_bloquees }} |
+                    Total: {{ a.total_taches }}
+                </small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 2. Durée moyenne des tâches -->
+    <div class="col-lg-6">
+        <div class="section-card h-100">
+            <h5><i class="bi bi-clock text-info"></i> Durée moyenne des tâches (jours)</h5>
+            {% if durees %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Projet</th>
+                            <th class="text-center">Moyenne</th>
+                            <th class="text-center">Min</th>
+                            <th class="text-center">Max</th>
+                            <th class="text-center">Nb tâches</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in durees %}
+                        <tr>
+                            <td>{{ d.nom_projet }}</td>
+                            <td class="text-center fw-bold">{{ d.duree_moyenne_jours }}j</td>
+                            <td class="text-center text-success">{{ d.duree_min_jours }}j</td>
+                            <td class="text-center text-danger">{{ d.duree_max_jours }}j</td>
+                            <td class="text-center">{{ d.nb_taches_terminees }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Aucune tâche terminée.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 3. Tâches en retard -->
+    <div class="col-lg-8">
+        <div class="section-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> Tâches en retard ({{ retards|length }})</h5>
+                <a href="{{ url_for('taches_en_retard_page') }}" class="btn btn-sm btn-outline-danger">Détail</a>
+            </div>
+            {% if retards %}
+            <div class="table-responsive mt-3">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Tâche</th>
+                            <th>Projet</th>
+                            <th>Assigné</th>
+                            <th class="text-center">Retard</th>
+                            <th class="text-center">Priorité</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in retards %}
+                        <tr>
+                            <td>{{ r.titre }}</td>
+                            <td><small>{{ r.nom_projet }}</small></td>
+                            <td><small>{{ r.assignee_nom }}</small></td>
+                            <td class="text-center">
+                                <span class="badge bg-danger">{{ r.jours_retard|int }}j</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-{{ r.priorite|priorite_badge }}">{{ r.priorite }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-success mt-3">Aucune tâche en retard !</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 4. Retard moyen par projet -->
+    <div class="col-lg-4">
+        <div class="section-card h-100">
+            <h5><i class="bi bi-clock-history text-warning"></i> Retard moyen / projet</h5>
+            {% for r in retard_projets %}
+            <div class="d-flex justify-content-between align-items-center py-2 {% if not loop.last %}border-bottom{% endif %}">
+                <div>
+                    <strong>{{ r.nom_projet }}</strong>
+                    <br><small class="text-muted">{{ r.nb_taches_en_retard }} tâche(s)</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-warning text-dark">{{ r.retard_moyen_jours }}j moy.</span>
+                    <br><small class="text-muted">max {{ r.retard_max_jours }}j</small>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not retard_projets %}
+            <p class="text-muted">Aucun retard.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 5. Charge par membre -->
+    <div class="col-lg-6">
+        <div class="section-card">
+            <h5><i class="bi bi-people text-primary"></i> Charge par membre</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Membre</th>
+                            <th>Rôle</th>
+                            <th class="text-center">Actives</th>
+                            <th class="text-center">En cours</th>
+                            <th class="text-center">Todo</th>
+                            <th class="text-center">Bloquées</th>
+                            <th class="text-center">Heures</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in charges %}
+                        <tr>
+                            <td><strong>{{ c.nom_complet }}</strong></td>
+                            <td><small>{{ c.role }}</small></td>
+                            <td class="text-center"><span class="badge bg-primary">{{ c.nb_taches_actives }}</span></td>
+                            <td class="text-center">{{ c.nb_in_progress }}</td>
+                            <td class="text-center">{{ c.nb_todo }}</td>
+                            <td class="text-center">
+                                {% if c.nb_blocked > 0 %}
+                                <span class="text-danger fw-bold">{{ c.nb_blocked }}</span>
+                                {% else %}0{% endif %}
+                            </td>
+                            <td class="text-center">{{ c.heures_estimees_total }}h</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Membres les plus/moins chargés -->
+    <div class="col-lg-6">
+        <div class="section-card">
+            <h5><i class="bi bi-bar-chart text-success"></i> Membres les plus / moins chargés</h5>
+
+            <h6 class="text-danger mt-3"><i class="bi bi-arrow-up"></i> Plus chargé(s)</h6>
+            {% for m in extremes.get('plus_charges', []) %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-danger">{{ m.nb_taches_actives }} tâches</span>
+                <strong>{{ m.nom_complet }}</strong>
+                <small class="text-muted">({{ m.role }})</small>
+            </div>
+            {% endfor %}
+
+            <h6 class="text-success mt-3"><i class="bi bi-arrow-down"></i> Moins chargé(s)</h6>
+            {% for m in extremes.get('moins_charges', []) %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-success">{{ m.nb_taches_actives }} tâches</span>
+                <strong>{{ m.nom_complet }}</strong>
+                <small class="text-muted">({{ m.role }})</small>
+            </div>
+            {% endfor %}
+
+            <h6 class="mt-4">Classement complet</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <tbody>
+                        {% for m in extremes.get('classement', []) %}
+                        <tr>
+                            <td>{{ loop.index }}.</td>
+                            <td>{{ m.nom_complet }}</td>
+                            <td><small class="text-muted">{{ m.role }}</small></td>
+                            <td class="text-end">
+                                <span class="badge bg-{% if loop.first %}danger{% elif loop.last %}success{% else %}secondary{% endif %}">
+                                    {{ m.nb_taches_actives }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

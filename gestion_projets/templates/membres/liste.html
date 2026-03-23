@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Membres — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Membres de l'équipe</h4>
+    <a href="{{ url_for('ajouter_membre') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Nouveau membre
+    </a>
+</div>
+
+<div class="row g-4">
+    {% for m in membres %}
+    <div class="col-lg-6 col-xl-4">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h5 class="card-title mb-0">{{ m.prenom }} {{ m.nom }}</h5>
+                        <small class="text-muted">{{ m.email }}</small>
+                    </div>
+                    <span class="badge bg-{{ m.role|statut_badge if m.role in ['chef_projet'] else 'secondary' }}">
+                        {{ m.role }}
+                    </span>
+                </div>
+
+                <!-- Compétences -->
+                <div class="mb-3">
+                    {% for c in m.competences %}
+                    <span class="badge bg-light text-dark border me-1 mb-1">{{ c }}</span>
+                    {% endfor %}
+                </div>
+
+                <!-- Stats charge -->
+                <div class="d-flex gap-3">
+                    <div class="text-center">
+                        <div class="fs-4 fw-bold text-primary">{{ m.nb_actives }}</div>
+                        <small class="text-muted">Tâches actives</small>
+                    </div>
+                    {% if m.nb_retard > 0 %}
+                    <div class="text-center">
+                        <div class="fs-4 fw-bold text-danger">{{ m.nb_retard }}</div>
+                        <small class="text-muted">En retard</small>
+                    </div>
+                    {% endif %}
+                    <div class="text-center">
+                        <small class="text-muted">Embauché le<br>{{ m.date_embauche|datefr }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0 d-flex gap-2">
+                <a href="{{ url_for('modifier_membre', id=m._id) }}" class="btn btn-sm btn-outline-secondary flex-fill">
+                    <i class="bi bi-pencil"></i> Modifier
+                </a>
+                <form action="{{ url_for('supprimer_membre', id=m._id) }}" method="post"
+                      onsubmit="return confirm('Supprimer ce membre ?')">
+                    <button class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not membres %}
+<div class="text-center py-5">
+    <i class="bi bi-people display-1 text-muted"></i>
+    <p class="text-muted mt-3">Aucun membre pour le moment.</p>
+    <a href="{{ url_for('ajouter_membre') }}" class="btn btn-primary">Ajouter un membre</a>
+</div>
+{% endif %}
+{% endblock %}

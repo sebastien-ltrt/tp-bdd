@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Tâches — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-check2-square me-2"></i>Tâches</h4>
+    <a href="{{ url_for('ajouter_tache') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nouvelle tâche
+    </a>
+</div>
+
+<!-- Filtres -->
+<div class="section-card mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Statut</label>
+            <select name="statut" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for s in ["todo", "in_progress", "done", "blocked"] %}
+                <option value="{{ s }}" {% if filtre_statut == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Priorité</label>
+            <select name="priorite" class="form-select form-select-sm">
+                <option value="">Toutes</option>
+                {% for p in ["low", "medium", "high", "critical"] %}
+                <option value="{{ p }}" {% if filtre_priorite == p %}selected{% endif %}>{{ p }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Projet</label>
+            <select name="projet_id" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for p in projets %}
+                <option value="{{ p._id }}" {% if filtre_projet == p._id|string %}selected{% endif %}>{{ p.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-funnel"></i> Filtrer
+            </button>
+            <a href="{{ url_for('liste_taches') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des tâches -->
+<div class="table-modern">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Projet</th>
+                    <th>Assigné</th>
+                    <th class="text-center">Statut</th>
+                    <th class="text-center">Priorité</th>
+                    <th class="text-center">Échéance</th>
+                    <th class="text-center">Heures</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in taches %}
+                <tr class="{{ 'table-danger bg-opacity-10' if t.est_en_retard else '' }}">
+                    <td>
+                        <strong>{{ t.titre }}</strong>
+                        {% if t.est_en_retard %}
+                        <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="En retard"></i>
+                        {% endif %}
+                    </td>
+                    <td><small>{{ t.nom_projet }}</small></td>
+                    <td><small>{{ t.assignee_nom }}</small></td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ t.statut|statut_badge }}">{{ t.statut }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ t.priorite|priorite_badge }}">{{ t.priorite }}</span>
+                    </td>
+                    <td class="text-center">
+                        <small {% if t.est_en_retard %}class="text-danger fw-bold"{% endif %}>
+                            {{ t.date_echeance|datefr }}
+                        </small>
+                    </td>
+                    <td class="text-center">
+                        <small>{{ t.temps_estime_heures }}h</small>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    {% for s in ["todo", "in_progress", "done", "blocked"] %}
+                                    {% if s != t.statut %}
+                                    <li>
+                                        <form action="{{ url_for('changer_statut_tache', id=t._id) }}" method="post">
+                                            <input type="hidden" name="statut" value="{{ s }}">
+                                            <button class="dropdown-item">
+                                                <span class="badge bg-{{ s|statut_badge }} me-1">{{ s }}</span>
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <a href="{{ url_for('modifier_tache', id=t._id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{{ url_for('supprimer_tache', id=t._id) }}" method="post"
+                                  onsubmit="return confirm('Supprimer cette tâche ?')">
+                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<p class="text-muted small mt-2">{{ taches|length }} tâche(s) affichée(s)</p>
+{% endblock %}

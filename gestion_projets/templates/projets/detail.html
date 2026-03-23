@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ projet.nom }} — Gestion de Projets{% endblock %}
+
+{% block content %}
+<!-- En-tête projet -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">{{ projet.nom }}</h4>
+        <p class="text-muted mb-0">{{ projet.description }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('modifier_projet', id=projet._id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil"></i> Modifier
+        </a>
+        <a href="{{ url_for('ajouter_tache') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> Nouvelle tâche
+        </a>
+    </div>
+</div>
+
+<!-- Infos + Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card p-3 text-center">
+            <div class="stat-value text-primary">{{ stats.pct }}%</div>
+            <div class="stat-label">Avancement</div>
+            <div class="progress mt-2">
+                <div class="progress-bar bg-success" style="width: {{ stats.pct }}%"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3 text-center">
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Tâches au total</div>
+            <small class="text-muted mt-1">
+                <span class="text-success">{{ stats.done }} ok</span> &middot;
+                <span class="text-primary">{{ stats.in_progress }} en cours</span> &middot;
+                <span class="text-secondary">{{ stats.todo }} todo</span>
+            </small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3 text-center">
+            {% if stats.en_retard > 0 %}
+            <div class="stat-value text-danger">{{ stats.en_retard }}</div>
+            {% else %}
+            <div class="stat-value text-success">0</div>
+            {% endif %}
+            <div class="stat-label">En retard</div>
+            <small class="text-muted">{{ stats.blocked }} bloquée(s)</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3 text-center">
+            <div class="stat-value">{{ stats.h_reel }}<small class="fs-6">/{{ stats.h_est }}h</small></div>
+            <div class="stat-label">Heures (réel/estimé)</div>
+            {% if chef %}
+            <small class="text-muted"><i class="bi bi-person"></i> {{ chef.prenom }} {{ chef.nom }}</small>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Infos projet -->
+<div class="section-card mb-4">
+    <div class="row text-muted small">
+        <div class="col-auto">
+            <strong>Statut :</strong> <span class="badge bg-{{ projet.statut|statut_badge }}">{{ projet.statut }}</span>
+        </div>
+        <div class="col-auto">
+            <strong>Budget :</strong> {{ "{:,.0f}".format(projet.budget) }} EUR
+        </div>
+        <div class="col-auto">
+            <strong>Début :</strong> {{ projet.date_debut|datefr }}
+        </div>
+        <div class="col-auto">
+            <strong>Fin prévue :</strong> {{ projet.date_fin_prevue|datefr }}
+        </div>
+        {% if projet.date_fin_reelle %}
+        <div class="col-auto">
+            <strong>Fin réelle :</strong> {{ projet.date_fin_reelle|datefr }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Liste des tâches -->
+<div class="section-card">
+    <h5><i class="bi bi-list-check text-primary"></i> Tâches du projet</h5>
+
+    {% if taches %}
+    <div class="table-responsive">
+        <table class="table table-sm table-modern mb-0">
+            <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Assigné</th>
+                    <th class="text-center">Statut</th>
+                    <th class="text-center">Priorité</th>
+                    <th class="text-center">Échéance</th>
+                    <th class="text-center">Heures</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in taches %}
+                {% set en_retard = t.statut != 'done' and t.date_echeance < now %}
+                <tr class="{{ 'table-danger bg-opacity-10' if en_retard else '' }}">
+                    <td>
+                        <strong>{{ t.titre }}</strong>
+                        {% if en_retard %}<i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="En retard"></i>{% endif %}
+                        {% if t.description %}<br><small class="text-muted">{{ t.description[:60] }}...</small>{% endif %}
+                    </td>
+                    <td><small>{{ t.assignee_nom }}</small></td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ t.statut|statut_badge }}">{{ t.statut }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-{{ t.priorite|priorite_badge }}">{{ t.priorite }}</span>
+                    </td>
+                    <td class="text-center">
+                        <small>{{ t.date_echeance|datefr }}</small>
+                    </td>
+                    <td class="text-center">
+                        <small>{{ t.temps_reel_heures or '—' }}/{{ t.temps_estime_heures }}h</small>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <!-- Changement rapide de statut -->
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Changer le statut">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    {% for s in ["todo", "in_progress", "done", "blocked"] %}
+                                    {% if s != t.statut %}
+                                    <li>
+                                        <form action="{{ url_for('changer_statut_tache', id=t._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="statut" value="{{ s }}">
+                                            <button class="dropdown-item">
+                                                <span class="badge bg-{{ s|statut_badge }} me-1">{{ s }}</span>
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <a href="{{ url_for('modifier_tache', id=t._id) }}" class="btn btn-sm btn-outline-primary" title="Modifier">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{{ url_for('supprimer_tache', id=t._id) }}" method="post"
+                                  onsubmit="return confirm('Supprimer cette tâche ?')" class="d-inline">
+                                <button class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-3">Aucune tâche dans ce projet.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Variable pour le template Jinja
+    const now = new Date();
+</script>
+{% endblock %}

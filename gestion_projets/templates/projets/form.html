@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ "Modifier" if projet else "Ajouter" }} un projet — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="section-card">
+            <h4 class="fw-bold mb-4">
+                <i class="bi bi-{{ 'pencil' if projet else 'plus-lg' }} me-2"></i>
+                {{ "Modifier le projet" if projet else "Nouveau projet" }}
+            </h4>
+
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Nom du projet</label>
+                        <input type="text" name="nom" class="form-control" required
+                               value="{{ projet.nom if projet else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Statut</label>
+                        <select name="statut" class="form-select" required>
+                            {% set statuts = ["planifie", "en_cours", "termine", "annule", "en_pause"] %}
+                            {% for s in statuts %}
+                            <option value="{{ s }}" {% if projet and projet.statut == s %}selected{% endif %}>
+                                {{ s }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="description" class="form-control" rows="3" required>{{ projet.description if projet else '' }}</textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date de début</label>
+                        <input type="date" name="date_debut" class="form-control" required
+                               value="{{ projet.date_debut.strftime('%Y-%m-%d') if projet else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date de fin prévue</label>
+                        <input type="date" name="date_fin_prevue" class="form-control" required
+                               value="{{ projet.date_fin_prevue.strftime('%Y-%m-%d') if projet else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date de fin réelle</label>
+                        <input type="date" name="date_fin_reelle" class="form-control"
+                               value="{{ projet.date_fin_reelle.strftime('%Y-%m-%d') if projet and projet.date_fin_reelle else '' }}">
+                        <small class="text-muted">Remplir si le projet est terminé</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Budget (EUR)</label>
+                        <input type="number" name="budget" class="form-control" step="0.01" min="0" required
+                               value="{{ projet.budget if projet else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Chef de projet</label>
+                        <select name="chef_projet_id" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for m in membres %}
+                            <option value="{{ m._id }}"
+                                {% if projet and projet.chef_projet_id == m._id %}selected{% endif %}>
+                                {{ m.prenom }} {{ m.nom }} ({{ m.role }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {{ "Enregistrer" if projet else "Créer le projet" }}
+                    </button>
+                    <a href="{{ url_for('liste_projets') }}" class="btn btn-outline-secondary">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

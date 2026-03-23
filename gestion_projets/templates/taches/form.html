@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ "Modifier" if tache else "Ajouter" }} une tâche — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="section-card">
+            <h4 class="fw-bold mb-4">
+                <i class="bi bi-{{ 'pencil' if tache else 'plus-lg' }} me-2"></i>
+                {{ "Modifier la tâche" if tache else "Nouvelle tâche" }}
+            </h4>
+
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Titre</label>
+                        <input type="text" name="titre" class="form-control" required
+                               value="{{ tache.titre if tache else '' }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="description" class="form-control" rows="2">{{ tache.description if tache else '' }}</textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Projet</label>
+                        <select name="projet_id" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for p in projets %}
+                            <option value="{{ p._id }}"
+                                {% if tache and tache.projet_id == p._id %}selected{% endif %}>
+                                {{ p.nom }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Assigné à</label>
+                        <select name="assignee_id" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for m in membres %}
+                            <option value="{{ m._id }}"
+                                {% if tache and tache.assignee_id == m._id %}selected{% endif %}>
+                                {{ m.prenom }} {{ m.nom }} ({{ m.role }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Priorité</label>
+                        <select name="priorite" class="form-select" required>
+                            {% for p in ["low", "medium", "high", "critical"] %}
+                            <option value="{{ p }}" {% if tache and tache.priorite == p %}selected{% endif %}>
+                                {{ p }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date de début</label>
+                        <input type="date" name="date_debut" class="form-control" required
+                               value="{{ tache.date_debut.strftime('%Y-%m-%d') if tache else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date d'échéance</label>
+                        <input type="date" name="date_echeance" class="form-control" required
+                               value="{{ tache.date_echeance.strftime('%Y-%m-%d') if tache else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Temps estimé (heures)</label>
+                        <input type="number" name="temps_estime_heures" class="form-control" step="0.5" min="0" required
+                               value="{{ tache.temps_estime_heures if tache else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Temps réel (heures)</label>
+                        <input type="number" name="temps_reel_heures" class="form-control" step="0.5" min="0"
+                               value="{{ tache.temps_reel_heures if tache and tache.temps_reel_heures else '' }}">
+                        <small class="text-muted">Optionnel</small>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {{ "Enregistrer" if tache else "Créer la tâche" }}
+                    </button>
+                    <a href="{{ url_for('liste_taches') }}" class="btn btn-outline-secondary">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
