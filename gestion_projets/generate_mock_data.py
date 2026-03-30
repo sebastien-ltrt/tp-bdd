@@ -8,6 +8,7 @@ generate_mock_data.py - Génère des données de test réalistes
 """
 
 import random
+import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta
 from faker import Faker
@@ -126,7 +127,9 @@ def generer_membres() -> list:
         prenom = fake.first_name()
         nom = fake.last_name()
 
-        base = f"{prenom.lower()}.{nom.lower()}"
+        prenom_ascii = unicodedata.normalize("NFKD", prenom).encode("ascii", "ignore").decode()
+        nom_ascii = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode()
+        base = f"{prenom_ascii.lower()}.{nom_ascii.lower()}"
         base = "".join(c for c in base if c.isalnum() or c == ".")
         email = f"{base}@entreprise.fr"
         i = 1

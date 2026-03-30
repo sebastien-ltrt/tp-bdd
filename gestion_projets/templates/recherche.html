@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Recherche — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-1"><i class="bi bi-search me-2"></i>Recherche</h4>
+    {% if q %}
+    <p class="text-muted mb-0">Résultats pour <strong>« {{ q }} »</strong></p>
+    {% endif %}
+</div>
+
+<!-- Barre de recherche -->
+<div class="section-card mb-4">
+    <form method="get" action="{{ url_for('recherche.index') }}" class="d-flex gap-2">
+        <input type="text" name="q" class="form-control" placeholder="Rechercher un projet, une tâche, un membre…"
+               value="{{ q }}" autofocus>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-search me-1"></i> Rechercher
+        </button>
+    </form>
+</div>
+
+{% if q %}
+    {% set total = projets|length + membres|length + taches|length %}
+
+    {% if total == 0 %}
+    <div class="text-center py-5">
+        <i class="bi bi-search display-1 text-muted"></i>
+        <p class="text-muted mt-3">Aucun résultat pour « {{ q }} ».</p>
+    </div>
+    {% endif %}
+
+    <!-- Projets -->
+    {% if projets %}
+    <div class="section-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0"><i class="bi bi-folder2-open me-2 text-primary"></i>Projets <span class="badge bg-primary ms-1">{{ projets|length }}</span></h5>
+            <div class="d-flex gap-2 align-items-center">
+                <small class="text-muted">Trier :</small>
+                {% for label, field in [('Nom','nom'), ('Statut','statut'), ('Date','date')] %}
+                    {% set cur_tri_p = request.args.get('tri_p', 'nom') %}
+                    {% set cur_ord_p = request.args.get('ord_p', 'asc') %}
+                    {% set new_ord = 'desc' if (cur_tri_p == field and cur_ord_p == 'asc') else 'asc' %}
+                    <a href="{{ url_for('recherche.index', q=q, tri_p=field, ord_p=new_ord, tri_m=request.args.get('tri_m','nom'), ord_m=request.args.get('ord_m','asc'), tri_t=request.args.get('tri_t','titre'), ord_t=request.args.get('ord_t','asc')) }}"
+                       class="btn btn-xs btn-sm {{ 'btn-primary' if cur_tri_p == field else 'btn-outline-secondary' }}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
+                        {{ label }}
+                        {% if cur_tri_p == field %}<i class="bi bi-arrow-{{ 'up' if cur_ord_p == 'asc' else 'down' }}-short"></i>{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% set tri_p = request.args.get('tri_p', 'nom') %}
+        {% set ord_p = request.args.get('ord_p', 'asc') %}
+        {% if tri_p == 'nom' %}
+            {% set projets_sorted = projets|sort(attribute='nom', reverse=(ord_p == 'desc')) %}
+        {% elif tri_p == 'statut' %}
+            {% set projets_sorted = projets|sort(attribute='statut', reverse=(ord_p == 'desc')) %}
+        {% else %}
+            {% set projets_sorted = projets|sort(attribute='date_debut', reverse=(ord_p == 'desc')) %}
+        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th class="text-center">Statut</th>
+                        <th class="text-center">Date début</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projets_sorted %}
+                    <tr style="cursor:pointer;" onclick="window.location='{{ url_for('projets.detail', id=p._id) }}'">
+                        <td><strong>{{ p.nom }}</strong></td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ p.statut|statut_badge }}">{{ p.statut }}</span>
+                        </td>
+                        <td class="text-center"><small>{{ p.date_debut|datefr }}</small></td>
+                        <td class="text-end">
+                            <a href="{{ url_for('projets.detail', id=p._id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> Voir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tâches -->
+    {% if taches %}
+    <div class="section-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0"><i class="bi bi-check2-square me-2 text-success"></i>Tâches <span class="badge bg-success ms-1">{{ taches|length }}</span></h5>
+            <div class="d-flex gap-2 align-items-center">
+                <small class="text-muted">Trier :</small>
+                {% for label, field in [('Titre','titre'), ('Statut','statut'), ('Priorité','priorite')] %}
+                    {% set cur_tri_t = request.args.get('tri_t', 'titre') %}
+                    {% set cur_ord_t = request.args.get('ord_t', 'asc') %}
+                    {% set new_ord = 'desc' if (cur_tri_t == field and cur_ord_t == 'asc') else 'asc' %}
+                    <a href="{{ url_for('recherche.index', q=q, tri_t=field, ord_t=new_ord, tri_p=request.args.get('tri_p','nom'), ord_p=request.args.get('ord_p','asc'), tri_m=request.args.get('tri_m','nom'), ord_m=request.args.get('ord_m','asc')) }}"
+                       class="btn btn-sm {{ 'btn-success' if cur_tri_t == field else 'btn-outline-secondary' }}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
+                        {{ label }}
+                        {% if cur_tri_t == field %}<i class="bi bi-arrow-{{ 'up' if cur_ord_t == 'asc' else 'down' }}-short"></i>{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% set tri_t = request.args.get('tri_t', 'titre') %}
+        {% set ord_t = request.args.get('ord_t', 'asc') %}
+        {% if tri_t == 'statut' %}
+            {% set taches_sorted = taches|sort(attribute='statut', reverse=(ord_t == 'desc')) %}
+        {% elif tri_t == 'priorite' %}
+            {% set taches_sorted = taches|sort(attribute='priorite', reverse=(ord_t == 'desc')) %}
+        {% else %}
+            {% set taches_sorted = taches|sort(attribute='titre', reverse=(ord_t == 'desc')) %}
+        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Titre</th>
+                        <th>Projet</th>
+                        <th class="text-center">Statut</th>
+                        <th class="text-center">Priorité</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in taches_sorted %}
+                    <tr style="cursor:pointer;" onclick="window.location='{{ url_for('taches.detail', id=t._id) }}'">
+                        <td><strong>{{ t.titre }}</strong></td>
+                        <td>
+                            {% if t.projet_id %}
+                            <small class="text-muted">{{ t.nom_projet or '—' }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ t.statut|statut_badge }}">{{ t.statut }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ t.priorite|priorite_badge }}">{{ t.priorite }}</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('taches.detail', id=t._id) }}" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Membres -->
+    {% if membres %}
+    <div class="section-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0"><i class="bi bi-people me-2 text-warning"></i>Membres <span class="badge bg-warning text-dark ms-1">{{ membres|length }}</span></h5>
+            <div class="d-flex gap-2 align-items-center">
+                <small class="text-muted">Trier :</small>
+                {% for label, field in [('Nom','nom'), ('Rôle','role')] %}
+                    {% set cur_tri_m = request.args.get('tri_m', 'nom') %}
+                    {% set cur_ord_m = request.args.get('ord_m', 'asc') %}
+                    {% set new_ord = 'desc' if (cur_tri_m == field and cur_ord_m == 'asc') else 'asc' %}
+                    <a href="{{ url_for('recherche.index', q=q, tri_m=field, ord_m=new_ord, tri_p=request.args.get('tri_p','nom'), ord_p=request.args.get('ord_p','asc'), tri_t=request.args.get('tri_t','titre'), ord_t=request.args.get('ord_t','asc')) }}"
+                       class="btn btn-sm {{ 'btn-warning' if cur_tri_m == field else 'btn-outline-secondary' }}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
+                        {{ label }}
+                        {% if cur_tri_m == field %}<i class="bi bi-arrow-{{ 'up' if cur_ord_m == 'asc' else 'down' }}-short"></i>{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% set tri_m = request.args.get('tri_m', 'nom') %}
+        {% set ord_m = request.args.get('ord_m', 'asc') %}
+        {% if tri_m == 'role' %}
+            {% set membres_sorted = membres|sort(attribute='role', reverse=(ord_m == 'desc')) %}
+        {% else %}
+            {% set membres_sorted = membres|sort(attribute='nom', reverse=(ord_m == 'desc')) %}
+        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th class="text-center">Rôle</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in membres_sorted %}
+                    <tr style="cursor:pointer;" onclick="window.location='{{ url_for('membres.detail', id=m._id) }}'">
+                        <td><strong>{{ m.prenom }} {{ m.nom }}</strong></td>
+                        <td><small>{{ m.email }}</small></td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ m.role }}</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('membres.detail', id=m._id) }}" class="btn btn-sm btn-outline-warning">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="text-muted small">{{ total }} résultat(s) trouvé(s)</p>
+{% endif %}
+{% endblock %}

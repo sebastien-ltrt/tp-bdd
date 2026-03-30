@@ -2,80 +2,217 @@
 {% block title %}Statistiques — Gestion de Projets{% endblock %}
 
 {% block content %}
-<h4 class="fw-bold mb-4"><i class="bi bi-bar-chart-line me-2"></i>Statistiques & Agrégations</h4>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-bar-chart-line me-2"></i>Statistiques & Agrégations</h4>
+    {% set nb_filtres = (projets_sel|length > 0)|int + (date_debut != '')|int + (date_fin != '')|int + (role_filtre|length > 0)|int %}
+    {% if nb_filtres > 0 %}
+    <span class="badge bg-primary fs-6"><i class="bi bi-funnel-fill me-1"></i>{{ nb_filtres }} filtre(s) actif(s)</span>
+    {% endif %}
+</div>
 
-<div class="row g-4">
-    <!-- 1. Avancement par projet -->
-    <div class="col-lg-6">
+<!-- ── Résumé phrase naturelle ───────────────────────────────────── -->
+<div class="mb-3 px-1" style="font-size:1rem;color:#475569;">
+    <i class="bi bi-chat-quote me-2 text-primary"></i>
+    Statistiques
+    {% if noms_projets_sel|length > 0 %}
+        dans
+        {% if noms_projets_sel|length == 1 %}
+            le projet <strong>« {{ noms_projets_sel[0] }} »</strong>
+        {% elif noms_projets_sel|length == 2 %}
+            les projets <strong>« {{ noms_projets_sel[0] }} »</strong> et <strong>« {{ noms_projets_sel[1] }} »</strong>
+        {% else %}
+            les projets <strong>« {{ noms_projets_sel[:-1] | join(' », « ') }} »</strong> et <strong>« {{ noms_projets_sel[-1] }} »</strong>
+        {% endif %}
+    {% else %}
+        sur <strong>tous les projets</strong>
+    {% endif %}
+    {% if role_filtre|length > 0 %}
+        , pour les <strong>{{ role_filtre | join(', ') }}</strong>
+    {% else %}
+        , pour <strong>tous les rôles</strong>
+    {% endif %}
+    {% if date_debut and date_fin %}
+        , avec des tâches dont l'échéance est entre le <strong>{{ date_debut }}</strong> et le <strong>{{ date_fin }}</strong>
+    {% elif date_debut %}
+        , avec des tâches dont l'échéance est à partir du <strong>{{ date_debut }}</strong>
+    {% elif date_fin %}
+        , avec des tâches dont l'échéance est avant le <strong>{{ date_fin }}</strong>
+    {% endif %}
+    .
+</div>
+
+<!-- ── Panneau de filtres ─────────────────────────────────────────── -->
+<div class="section-card mb-4">
+    <form method="get" id="form-filtres">
+        <div class="row g-3 align-items-end">
+
+            <!-- Projets (checkboxes) -->
+            <div class="col-lg-5">
+                <label class="form-label small fw-semibold">
+                    <i class="bi bi-folder2-open me-1"></i>Projets
+                    <small class="text-muted fw-normal">(tous si aucun coché)</small>
+                </label>
+                <div class="border rounded p-2" style="max-height:130px;overflow-y:auto;background:#f8fafc;">
+                    {% for p in tous_projets %}
+                    <div class="form-check mb-1">
+                        <input class="form-check-input projet-cb" type="checkbox"
+                               name="projets_sel" value="{{ p._id }}"
+                               id="proj_{{ p._id }}"
+                               {% if p._id|string in projets_sel %}checked{% endif %}>
+                        <label class="form-check-label small" for="proj_{{ p._id }}">
+                            {{ p.nom }}
+                            <span class="badge bg-{{ p.statut|statut_badge }} ms-1" style="font-size:0.65rem;">{{ p.statut }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-1 d-flex gap-2">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-muted" style="font-size:0.75rem;"
+                            onclick="document.querySelectorAll('.projet-cb').forEach(c=>c.checked=true)">
+                        Tout cocher
+                    </button>
+                    <span class="text-muted" style="font-size:0.75rem;">·</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-muted" style="font-size:0.75rem;"
+                            onclick="document.querySelectorAll('.projet-cb').forEach(c=>c.checked=false)">
+                        Tout décocher
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="row g-2">
+                    <!-- Plage de dates -->
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">
+                            <i class="bi bi-calendar me-1"></i>Échéance depuis
+                        </label>
+                        <input type="date" name="date_debut" class="form-control form-control-sm"
+                               value="{{ date_debut }}">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">jusqu'au</label>
+                        <input type="date" name="date_fin" class="form-control form-control-sm"
+                               value="{{ date_fin }}">
+                    </div>
+                    <!-- Rôles membres -->
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">
+                            <i class="bi bi-person-badge me-1"></i>Rôles membres (charge)
+                            <small class="text-muted fw-normal">(tous si aucun coché)</small>
+                        </label>
+                        <div class="border rounded p-2 d-flex flex-wrap gap-2" style="background:#f8fafc;">
+                            {% for r in roles %}
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input role-cb" type="checkbox"
+                                       name="role_filtre" value="{{ r }}"
+                                       id="role_{{ r }}"
+                                       {% if r in role_filtre %}checked{% endif %}>
+                                <label class="form-check-label small" for="role_{{ r }}">{{ r }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-1 d-flex gap-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-muted" style="font-size:0.75rem;"
+                                    onclick="document.querySelectorAll('.role-cb').forEach(c=>c.checked=true)">
+                                Tout cocher
+                            </button>
+                            <span class="text-muted" style="font-size:0.75rem;">·</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-muted" style="font-size:0.75rem;"
+                                    onclick="document.querySelectorAll('.role-cb').forEach(c=>c.checked=false)">
+                                Tout décocher
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 d-flex flex-column gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-funnel me-1"></i>Appliquer
+                </button>
+                <a href="{{ url_for('stats.statistiques') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Ligne 1 : graphiques ───────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+
+    <!-- Avancement par projet (barres horizontales) -->
+    <div class="col-lg-8">
         <div class="section-card h-100">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0"><i class="bi bi-graph-up text-success"></i> Avancement par projet</h5>
-                <a href="{{ url_for('export_avancement_csv') }}" class="btn btn-sm btn-outline-success">
+                <h5 class="mb-0"><i class="bi bi-graph-up text-success me-2"></i>Avancement par projet</h5>
+                <a href="{{ url_for('exports.avancement_csv') }}" class="btn btn-sm btn-outline-success">
                     <i class="bi bi-download me-1"></i>CSV
                 </a>
             </div>
-            {% for a in avancements %}
-            <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                    <strong>{{ a.nom_projet }}</strong>
-                    <span>{{ a.pourcentage_avancement }}%</span>
-                </div>
-                <div class="progress">
-                    <div class="progress-bar bg-success" style="width: {{ a.pourcentage_avancement }}%"></div>
-                </div>
-                <small class="text-muted">
-                    Done: {{ a.taches_terminees }} | En cours: {{ a.taches_en_cours }} |
-                    Todo: {{ a.taches_todo }} | Bloquées: {{ a.taches_bloquees }} |
-                    Total: {{ a.total_taches }}
-                </small>
-            </div>
-            {% endfor %}
+            <canvas id="chartAvancement" height="200"></canvas>
         </div>
     </div>
 
-    <!-- 2. Durée moyenne des tâches -->
-    <div class="col-lg-6">
-        <div class="section-card h-100">
-            <h5><i class="bi bi-clock text-info"></i> Durée moyenne des tâches (jours)</h5>
-            {% if durees %}
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Projet</th>
-                            <th class="text-center">Moyenne</th>
-                            <th class="text-center">Min</th>
-                            <th class="text-center">Max</th>
-                            <th class="text-center">Nb tâches</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for d in durees %}
-                        <tr>
-                            <td>{{ d.nom_projet }}</td>
-                            <td class="text-center fw-bold">{{ d.duree_moyenne_jours }}j</td>
-                            <td class="text-center text-success">{{ d.duree_min_jours }}j</td>
-                            <td class="text-center text-danger">{{ d.duree_max_jours }}j</td>
-                            <td class="text-center">{{ d.nb_taches_terminees }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- Répartition globale des statuts (donut) -->
+    <div class="col-lg-4">
+        <div class="section-card h-100 d-flex flex-column">
+            <h5><i class="bi bi-pie-chart text-primary me-2"></i>Statuts des tâches</h5>
+            <div class="flex-grow-1 d-flex align-items-center justify-content-center">
+                <canvas id="chartStatuts" style="max-height:220px;"></canvas>
             </div>
+        </div>
+    </div>
+
+    <!-- Charge par membre — top 10 (barres verticales) -->
+    <div class="col-lg-8">
+        <div class="section-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-people text-primary me-2"></i>Charge par membre (top 10)</h5>
+                <a href="{{ url_for('exports.charge_csv') }}" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-download me-1"></i>CSV
+                </a>
+            </div>
+            <canvas id="chartCharge" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Retard moyen par projet (barres) -->
+    <div class="col-lg-4">
+        <div class="section-card h-100">
+            <h5><i class="bi bi-clock-history text-warning me-2"></i>Retard moyen (jours)</h5>
+            {% if retard_projets %}
+            <canvas id="chartRetard" height="220"></canvas>
+            {% else %}
+            <p class="text-muted mt-3">Aucun retard.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Durée moyenne des tâches par projet -->
+    <div class="col-12">
+        <div class="section-card">
+            <h5><i class="bi bi-clock text-info me-2"></i>Durée moyenne des tâches terminées (heures)</h5>
+            {% if durees %}
+            <canvas id="chartDurees" height="80"></canvas>
             {% else %}
             <p class="text-muted">Aucune tâche terminée.</p>
             {% endif %}
         </div>
     </div>
+</div>
 
-    <!-- 3. Tâches en retard -->
+<!-- ── Ligne 2 : tableaux ─────────────────────────────────────────── -->
+<div class="row g-4">
+
+    <!-- Tâches en retard -->
     <div class="col-lg-8">
         <div class="section-card">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> Tâches en retard ({{ retards|length }})</h5>
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Tâches en retard ({{ retards|length }})</h5>
                 <div class="d-flex gap-2">
-                    <a href="{{ url_for('taches_en_retard_page') }}" class="btn btn-sm btn-outline-danger">Détail</a>
-                    <a href="{{ url_for('export_retards_csv') }}" class="btn btn-sm btn-outline-success">
+                    <a href="{{ url_for('taches.retard') }}" class="btn btn-sm btn-outline-danger">Détail</a>
+                    <a href="{{ url_for('exports.retards_csv') }}" class="btn btn-sm btn-outline-success">
                         <i class="bi bi-download me-1"></i>CSV
                     </a>
                 </div>
@@ -95,15 +232,11 @@
                     <tbody>
                         {% for r in retards %}
                         <tr>
-                            <td>{{ r.titre }}</td>
+                            <td><a href="{{ url_for('taches.detail', id=r._id) }}" class="text-decoration-none">{{ r.titre }}</a></td>
                             <td><small>{{ r.nom_projet }}</small></td>
                             <td><small>{{ r.assignee_nom }}</small></td>
-                            <td class="text-center">
-                                <span class="badge bg-danger">{{ r.jours_retard|int }}j</span>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge bg-{{ r.priorite|priorite_badge }}">{{ r.priorite }}</span>
-                            </td>
+                            <td class="text-center"><span class="badge bg-danger">{{ r.jours_retard|int }}j</span></td>
+                            <td class="text-center"><span class="badge bg-{{ r.priorite|priorite_badge }}">{{ r.priorite }}</span></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -115,48 +248,45 @@
         </div>
     </div>
 
-    <!-- 4. Retard moyen par projet -->
+    <!-- Membres plus/moins chargés -->
     <div class="col-lg-4">
-        <div class="section-card h-100">
-            <h5><i class="bi bi-clock-history text-warning"></i> Retard moyen / projet</h5>
-            {% for r in retard_projets %}
-            <div class="d-flex justify-content-between align-items-center py-2 {% if not loop.last %}border-bottom{% endif %}">
-                <div>
-                    <strong>{{ r.nom_projet }}</strong>
-                    <br><small class="text-muted">{{ r.nb_taches_en_retard }} tâche(s)</small>
-                </div>
-                <div class="text-end">
-                    <span class="badge bg-warning text-dark">{{ r.retard_moyen_jours }}j moy.</span>
-                    <br><small class="text-muted">max {{ r.retard_max_jours }}j</small>
-                </div>
+        <div class="section-card">
+            <h5><i class="bi bi-bar-chart text-success me-2"></i>Top membres</h5>
+
+            <h6 class="text-danger mt-3"><i class="bi bi-arrow-up"></i> Plus chargé(s)</h6>
+            {% for m in extremes.get('plus_charges', []) %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-danger">{{ m.nb_taches_actives }}</span>
+                <a href="{{ url_for('membres.detail', id=m._id) }}" class="text-decoration-none fw-semibold">{{ m.nom_complet }}</a>
+                <small class="text-muted">{{ m.role }}</small>
             </div>
             {% endfor %}
-            {% if not retard_projets %}
-            <p class="text-muted">Aucun retard.</p>
-            {% endif %}
+
+            <h6 class="text-success mt-3"><i class="bi bi-arrow-down"></i> Moins chargé(s)</h6>
+            {% for m in extremes.get('moins_charges', []) %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-success">{{ m.nb_taches_actives }}</span>
+                <a href="{{ url_for('membres.detail', id=m._id) }}" class="text-decoration-none fw-semibold">{{ m.nom_complet }}</a>
+                <small class="text-muted">{{ m.role }}</small>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- 5. Charge par membre -->
-    <div class="col-lg-6">
+    <!-- Tableau charge complet -->
+    <div class="col-12">
         <div class="section-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0"><i class="bi bi-people text-primary"></i> Charge par membre</h5>
-                <a href="{{ url_for('export_charge_csv') }}" class="btn btn-sm btn-outline-success">
-                    <i class="bi bi-download me-1"></i>CSV
-                </a>
-            </div>
+            <h5><i class="bi bi-table me-2 text-primary"></i>Détail charge par membre</h5>
             <div class="table-responsive">
                 <table class="table table-sm">
                     <thead>
                         <tr>
-                            <th>Membre</th>
-                            <th>Rôle</th>
+                            <th>Membre</th><th>Rôle</th>
                             <th class="text-center">Actives</th>
                             <th class="text-center">En cours</th>
                             <th class="text-center">Todo</th>
                             <th class="text-center">Bloquées</th>
-                            <th class="text-center">Heures</th>
+                            <th class="text-center">Heures est.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -167,11 +297,7 @@
                             <td class="text-center"><span class="badge bg-primary">{{ c.nb_taches_actives }}</span></td>
                             <td class="text-center">{{ c.nb_in_progress }}</td>
                             <td class="text-center">{{ c.nb_todo }}</td>
-                            <td class="text-center">
-                                {% if c.nb_blocked > 0 %}
-                                <span class="text-danger fw-bold">{{ c.nb_blocked }}</span>
-                                {% else %}0{% endif %}
-                            </td>
+                            <td class="text-center">{% if c.nb_blocked > 0 %}<span class="text-danger fw-bold">{{ c.nb_blocked }}</span>{% else %}0{% endif %}</td>
                             <td class="text-center">{{ c.heures_estimees_total }}h</td>
                         </tr>
                         {% endfor %}
@@ -181,43 +307,30 @@
         </div>
     </div>
 
-    <!-- 6. Membres les plus/moins chargés -->
-    <div class="col-lg-6">
+    <!-- Tableau durées -->
+    {% if durees %}
+    <div class="col-12">
         <div class="section-card">
-            <h5><i class="bi bi-bar-chart text-success"></i> Membres les plus / moins chargés</h5>
-
-            <h6 class="text-danger mt-3"><i class="bi bi-arrow-up"></i> Plus chargé(s)</h6>
-            {% for m in extremes.get('plus_charges', []) %}
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="badge bg-danger">{{ m.nb_taches_actives }} tâches</span>
-                <strong>{{ m.nom_complet }}</strong>
-                <small class="text-muted">({{ m.role }})</small>
-            </div>
-            {% endfor %}
-
-            <h6 class="text-success mt-3"><i class="bi bi-arrow-down"></i> Moins chargé(s)</h6>
-            {% for m in extremes.get('moins_charges', []) %}
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="badge bg-success">{{ m.nb_taches_actives }} tâches</span>
-                <strong>{{ m.nom_complet }}</strong>
-                <small class="text-muted">({{ m.role }})</small>
-            </div>
-            {% endfor %}
-
-            <h6 class="mt-4">Classement complet</h6>
+            <h5><i class="bi bi-clock text-info me-2"></i>Durée moyenne des tâches par projet</h5>
             <div class="table-responsive">
                 <table class="table table-sm">
-                    <tbody>
-                        {% for m in extremes.get('classement', []) %}
+                    <thead>
                         <tr>
-                            <td>{{ loop.index }}.</td>
-                            <td>{{ m.nom_complet }}</td>
-                            <td><small class="text-muted">{{ m.role }}</small></td>
-                            <td class="text-end">
-                                <span class="badge bg-{% if loop.first %}danger{% elif loop.last %}success{% else %}secondary{% endif %}">
-                                    {{ m.nb_taches_actives }}
-                                </span>
-                            </td>
+                            <th>Projet</th>
+                            <th class="text-center">Moyenne</th>
+                            <th class="text-center">Min</th>
+                            <th class="text-center">Max</th>
+                            <th class="text-center">Nb tâches terminées</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in durees %}
+                        <tr>
+                            <td>{{ d.nom_projet }}</td>
+                            <td class="text-center fw-bold">{{ d.duree_moyenne_jours }}h</td>
+                            <td class="text-center text-success">{{ d.duree_min_jours }}h</td>
+                            <td class="text-center text-danger">{{ d.duree_max_jours }}h</td>
+                            <td class="text-center">{{ d.nb_taches_terminees }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -225,5 +338,139 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const COLORS = {
+    done:        '#22c55e',
+    in_progress: '#3b82f6',
+    todo:        '#94a3b8',
+    blocked:     '#ef4444',
+};
+
+// ── 1. Avancement par projet ──────────────────────────────────────
+const avancements = {{ avancements | tojson }};
+new Chart(document.getElementById('chartAvancement'), {
+    type: 'bar',
+    data: {
+        labels: avancements.map(a => a.nom_projet.length > 25 ? a.nom_projet.slice(0,25)+'…' : a.nom_projet),
+        datasets: [
+            { label: 'Terminées',  data: avancements.map(a => a.taches_terminees),  backgroundColor: COLORS.done        },
+            { label: 'En cours',   data: avancements.map(a => a.taches_en_cours),   backgroundColor: COLORS.in_progress  },
+            { label: 'Todo',       data: avancements.map(a => a.taches_todo),       backgroundColor: COLORS.todo         },
+            { label: 'Bloquées',   data: avancements.map(a => a.taches_bloquees),   backgroundColor: COLORS.blocked      },
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
+});
+
+// ── 2. Donut statuts globaux ──────────────────────────────────────
+const totalDone       = avancements.reduce((s,a) => s + a.taches_terminees, 0);
+const totalInProgress = avancements.reduce((s,a) => s + a.taches_en_cours, 0);
+const totalTodo       = avancements.reduce((s,a) => s + a.taches_todo, 0);
+const totalBlocked    = avancements.reduce((s,a) => s + a.taches_bloquees, 0);
+
+new Chart(document.getElementById('chartStatuts'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Done', 'En cours', 'Todo', 'Bloquées'],
+        datasets: [{
+            data: [totalDone, totalInProgress, totalTodo, totalBlocked],
+            backgroundColor: [COLORS.done, COLORS.in_progress, COLORS.todo, COLORS.blocked],
+            borderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 } } },
+            tooltip: { callbacks: {
+                label: ctx => ` ${ctx.label} : ${ctx.parsed} (${Math.round(ctx.parsed/(totalDone+totalInProgress+totalTodo+totalBlocked)*100)}%)`
+            }}
+        }
+    }
+});
+
+// ── 3. Charge par membre (top 10) ─────────────────────────────────
+const charges = {{ charges | tojson }};
+const top10   = charges.slice(0, 10);
+new Chart(document.getElementById('chartCharge'), {
+    type: 'bar',
+    data: {
+        labels: top10.map(c => c.nom_complet),
+        datasets: [
+            { label: 'En cours',  data: top10.map(c => c.nb_in_progress), backgroundColor: COLORS.in_progress },
+            { label: 'Todo',      data: top10.map(c => c.nb_todo),        backgroundColor: COLORS.todo        },
+            { label: 'Bloquées',  data: top10.map(c => c.nb_blocked),     backgroundColor: COLORS.blocked     },
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
+});
+
+// ── 4. Retard moyen par projet ────────────────────────────────────
+{% if retard_projets %}
+const retardProjets = {{ retard_projets | tojson }};
+new Chart(document.getElementById('chartRetard'), {
+    type: 'bar',
+    data: {
+        labels: retardProjets.map(r => r.nom_projet.length > 18 ? r.nom_projet.slice(0,18)+'…' : r.nom_projet),
+        datasets: [{
+            label: 'Retard moyen (j)',
+            data: retardProjets.map(r => r.retard_moyen_jours),
+            backgroundColor: '#f59e0b',
+        }, {
+            label: 'Retard max (j)',
+            data: retardProjets.map(r => r.retard_max_jours),
+            backgroundColor: '#ef4444',
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+{% endif %}
+
+// ── 5. Durée moyenne par projet ───────────────────────────────────
+{% if durees %}
+const durees = {{ durees | tojson }};
+new Chart(document.getElementById('chartDurees'), {
+    type: 'bar',
+    data: {
+        labels: durees.map(d => d.nom_projet.length > 25 ? d.nom_projet.slice(0,25)+'…' : d.nom_projet),
+        datasets: [{
+            label: 'Durée moyenne (h)',
+            data: durees.map(d => d.duree_moyenne_jours),
+            backgroundColor: '#06b6d4',
+        }, {
+            label: 'Min (h)',
+            data: durees.map(d => d.duree_min_jours),
+            backgroundColor: '#22c55e',
+        }, {
+            label: 'Max (h)',
+            data: durees.map(d => d.duree_max_jours),
+            backgroundColor: '#f87171',
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+{% endif %}
+</script>
 {% endblock %}

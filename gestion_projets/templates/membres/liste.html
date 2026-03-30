@@ -4,9 +4,54 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Membres de l'équipe</h4>
-    <a href="{{ url_for('ajouter_membre') }}" class="btn btn-primary">
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('membres.ajouter') }}" class="btn btn-primary">
         <i class="bi bi-person-plus me-1"></i>Nouveau membre
     </a>
+    {% endif %}
+</div>
+
+<!-- Filtres -->
+<div class="section-card mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Rechercher</label>
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Nom, prénom, email…"
+                   value="{{ filtre_q }}" style="min-width:180px;">
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Rôle</label>
+            <select name="role" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for r in roles %}
+                <option value="{{ r }}" {% if filtre_role == r %}selected{% endif %}>{{ r }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Trier par</label>
+            <select name="tri" class="form-select form-select-sm">
+                <option value="nom" {% if tri == 'nom' %}selected{% endif %}>Nom</option>
+                <option value="role" {% if tri == 'role' %}selected{% endif %}>Rôle</option>
+                <option value="actives" {% if tri == 'actives' %}selected{% endif %}>Tâches actives</option>
+                <option value="retard" {% if tri == 'retard' %}selected{% endif %}>Tâches en retard</option>
+                <option value="embauche" {% if tri == 'embauche' %}selected{% endif %}>Date d'embauche</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Ordre</label>
+            <select name="ordre" class="form-select form-select-sm">
+                <option value="asc" {% if ordre == 'asc' %}selected{% endif %}>Croissant</option>
+                <option value="desc" {% if ordre == 'desc' %}selected{% endif %}>Décroissant</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-funnel"></i> Appliquer
+            </button>
+            <a href="{{ url_for('membres.liste') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+    </form>
 </div>
 
 <div class="row g-4">
@@ -49,15 +94,17 @@
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 d-flex gap-2">
-                <a href="{{ url_for('modifier_membre', id=m._id) }}" class="btn btn-sm btn-outline-secondary flex-fill">
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('membres.modifier', id=m._id) }}" class="btn btn-sm btn-outline-secondary flex-fill">
                     <i class="bi bi-pencil"></i> Modifier
                 </a>
-                <form action="{{ url_for('supprimer_membre', id=m._id) }}" method="post"
+                <form action="{{ url_for('membres.supprimer', id=m._id) }}" method="post"
                       onsubmit="return confirm('Supprimer ce membre ?')">
                     <button class="btn btn-sm btn-outline-danger">
                         <i class="bi bi-trash"></i>
                     </button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -67,8 +114,9 @@
 {% if not membres %}
 <div class="text-center py-5">
     <i class="bi bi-people display-1 text-muted"></i>
-    <p class="text-muted mt-3">Aucun membre pour le moment.</p>
-    <a href="{{ url_for('ajouter_membre') }}" class="btn btn-primary">Ajouter un membre</a>
+    <p class="text-muted mt-3">Aucun membre trouvé.</p>
 </div>
 {% endif %}
+
+<p class="text-muted small mt-3">{{ membres|length }} membre(s) affiché(s)</p>
 {% endblock %}

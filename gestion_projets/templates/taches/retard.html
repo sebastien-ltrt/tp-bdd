@@ -14,21 +14,41 @@
         <table class="table table-sm mb-0">
             <thead>
                 <tr>
-                    <th>Tâche</th>
-                    <th>Projet</th>
-                    <th>Assigné</th>
-                    <th class="text-center">Statut</th>
-                    <th class="text-center">Priorité</th>
-                    <th class="text-center">Échéance</th>
-                    <th class="text-center">Retard</th>
+                    {% macro sort_th(label, field) %}
+                        {% set new_ordre = 'desc' if (tri == field and ordre == 'asc') else 'asc' %}
+                        <a href="{{ url_for('taches.retard', tri=field, ordre=new_ordre) }}"
+                           class="text-decoration-none text-dark d-flex align-items-center gap-1">
+                            {{ label }}
+                            {% if tri == field %}
+                                <i class="bi bi-arrow-{{ 'up' if ordre == 'asc' else 'down' }}-short text-primary"></i>
+                            {% else %}
+                                <i class="bi bi-arrow-down-up opacity-25" style="font-size:0.75rem;"></i>
+                            {% endif %}
+                        </a>
+                    {% endmacro %}
+                    <th>{{ sort_th('Tâche', 'titre') }}</th>
+                    <th>{{ sort_th('Projet', 'projet') }}</th>
+                    <th>{{ sort_th('Assigné', 'assignee') }}</th>
+                    <th class="text-center">{{ sort_th('Statut', 'statut') }}</th>
+                    <th class="text-center">{{ sort_th('Priorité', 'priorite') }}</th>
+                    <th class="text-center">{{ sort_th('Échéance', 'date') }}</th>
+                    <th class="text-center">{{ sort_th('Retard', 'retard') }}</th>
                     <th class="text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in retards %}
                 <tr>
-                    <td><strong>{{ r.titre }}</strong></td>
-                    <td><small>{{ r.nom_projet }}</small></td>
+                    <td>
+                        <a href="{{ url_for('taches.detail', id=r._id) }}" class="text-decoration-none fw-semibold">
+                            {{ r.titre }}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('projets.detail', id=r.projet_id) }}" class="text-decoration-none text-muted small">
+                            {{ r.nom_projet }}
+                        </a>
+                    </td>
                     <td><small>{{ r.assignee_nom }}</small></td>
                     <td class="text-center">
                         <span class="badge bg-{{ r.statut|statut_badge }}">{{ r.statut }}</span>
@@ -50,15 +70,18 @@
                     </td>
                     <td class="text-center">
                         <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('taches.detail', id=r._id) }}" class="btn btn-sm btn-outline-primary" title="Voir détail">
+                                <i class="bi bi-eye"></i>
+                            </a>
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" title="Marquer comme...">
+                                <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" title="Changer statut">
                                     <i class="bi bi-arrow-repeat"></i>
                                 </button>
                                 <ul class="dropdown-menu">
                                     {% for s in ["in_progress", "done", "blocked"] %}
                                     {% if s != r.statut %}
                                     <li>
-                                        <form action="{{ url_for('changer_statut_tache', id=r._id) }}" method="post">
+                                        <form action="{{ url_for('taches.changer_statut', id=r._id) }}" method="post">
                                             <input type="hidden" name="statut" value="{{ s }}">
                                             <button class="dropdown-item">
                                                 <span class="badge bg-{{ s|statut_badge }} me-1">{{ s }}</span>
@@ -69,9 +92,11 @@
                                     {% endfor %}
                                 </ul>
                             </div>
-                            <a href="{{ url_for('modifier_tache', id=r._id) }}" class="btn btn-sm btn-outline-primary">
+                            {% if not current_user.is_membre %}
+                            <a href="{{ url_for('taches.modifier', id=r._id) }}" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

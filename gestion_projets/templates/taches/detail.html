@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ tache.titre }} — Gestion de Projets{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('taches.liste') }}" class="text-muted text-decoration-none small">
+        <i class="bi bi-arrow-left me-1"></i>Tâches
+    </a>
+    <div class="d-flex justify-content-between align-items-start mt-1">
+        <div>
+            <h4 class="fw-bold mb-0">
+                {{ tache.titre }}
+                {% if est_en_retard %}
+                <i class="bi bi-exclamation-triangle-fill text-danger ms-2" title="En retard"></i>
+                {% endif %}
+            </h4>
+            {% if projet %}
+            <small class="text-muted">
+                <i class="bi bi-folder2-open me-1"></i>
+                <a href="{{ url_for('projets.detail', id=projet._id) }}" class="text-decoration-none text-muted">
+                    {{ projet.nom }}
+                </a>
+            </small>
+            {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+            {% if not current_user.is_membre %}
+            <a href="{{ url_for('taches.modifier', id=tache._id) }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i> Modifier
+            </a>
+            {% endif %}
+            <!-- Changer statut rapide -->
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-arrow-repeat"></i> Changer statut
+                </button>
+                <ul class="dropdown-menu">
+                    {% for s in ["todo", "in_progress", "done", "blocked"] %}
+                    {% if s != tache.statut %}
+                    <li>
+                        <form action="{{ url_for('taches.changer_statut', id=tache._id) }}" method="post">
+                            <input type="hidden" name="statut" value="{{ s }}">
+                            <button class="dropdown-item">
+                                <span class="badge bg-{{ s|statut_badge }} me-1">{{ s }}</span>
+                            </button>
+                        </form>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Infos principales -->
+    <div class="col-md-8">
+        <div class="section-card mb-4">
+            <h5><i class="bi bi-info-circle me-2 text-primary"></i>Détails</h5>
+            {% if tache.description %}
+            <p class="mb-3">{{ tache.description }}</p>
+            {% endif %}
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <div class="p-3 rounded" style="background:#f8fafc;">
+                        <div class="small text-muted mb-1">Statut</div>
+                        <span class="badge bg-{{ tache.statut|statut_badge }} fs-6">{{ tache.statut }}</span>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 rounded" style="background:#f8fafc;">
+                        <div class="small text-muted mb-1">Priorité</div>
+                        <span class="badge bg-{{ tache.priorite|priorite_badge }} fs-6">{{ tache.priorite }}</span>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 rounded" style="background:#f8fafc;">
+                        <div class="small text-muted mb-1">Date de début</div>
+                        <strong>{{ tache.date_debut|datefr }}</strong>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 rounded {{ 'border border-danger' if est_en_retard else '' }}" style="background:#f8fafc;">
+                        <div class="small text-muted mb-1">Échéance</div>
+                        <strong class="{{ 'text-danger' if est_en_retard else '' }}">
+                            {{ tache.date_echeance|datefr }}
+                            {% if est_en_retard %}
+                            <span class="badge bg-danger ms-1">En retard</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+                {% if tache.date_fin_reelle %}
+                <div class="col-sm-6">
+                    <div class="p-3 rounded" style="background:#f8fafc;">
+                        <div class="small text-muted mb-1">Terminée le</div>
+                        <strong class="text-success">{{ tache.date_fin_reelle|datefr }}</strong>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Temps -->
+        <div class="section-card">
+            <h5><i class="bi bi-clock me-2 text-primary"></i>Temps</h5>
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <div class="p-3 rounded text-center" style="background:#f8fafc;">
+                        <div class="fs-3 fw-bold text-primary">{{ tache.temps_estime_heures }}h</div>
+                        <div class="small text-muted">Estimé</div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 rounded text-center" style="background:#f8fafc;">
+                        <div class="fs-3 fw-bold {{ 'text-success' if tache.temps_reel_heures else 'text-muted' }}">
+                            {{ tache.temps_reel_heures ~ 'h' if tache.temps_reel_heures else '—' }}
+                        </div>
+                        <div class="small text-muted">Réel</div>
+                    </div>
+                </div>
+            </div>
+            {% if tache.temps_reel_heures and tache.temps_estime_heures %}
+            {% set ecart = tache.temps_reel_heures - tache.temps_estime_heures %}
+            <p class="mt-3 mb-0 small {{ 'text-danger' if ecart > 0 else 'text-success' }}">
+                <i class="bi bi-{{ 'arrow-up' if ecart > 0 else 'arrow-down' }}-circle me-1"></i>
+                Écart : {{ '+' if ecart > 0 else '' }}{{ "%.1f"|format(ecart) }}h par rapport à l'estimation
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar infos -->
+    <div class="col-md-4">
+        <!-- Assigné -->
+        <div class="section-card mb-4">
+            <h5><i class="bi bi-person me-2 text-primary"></i>Assigné à</h5>
+            {% if assignee %}
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:white;flex-shrink:0;">
+                    {{ assignee.prenom[0]|upper }}{{ assignee.nom[0]|upper }}
+                </div>
+                <div>
+                    <div class="fw-semibold">{{ assignee.prenom }} {{ assignee.nom }}</div>
+                    <div class="small text-muted">{{ assignee.email }}</div>
+                    <span class="badge bg-secondary mt-1">{{ assignee.role }}</span>
+                </div>
+            </div>
+            {% if not current_user.is_membre %}
+            <div class="mt-3">
+                <a href="{{ url_for('membres.detail', id=assignee._id) }}" class="btn btn-sm btn-outline-primary w-100">
+                    <i class="bi bi-eye me-1"></i>Voir le profil
+                </a>
+            </div>
+            {% endif %}
+            {% else %}
+            <p class="text-muted mb-0">Non assigné</p>
+            {% endif %}
+        </div>
+
+        <!-- Projet -->
+        {% if projet %}
+        <div class="section-card">
+            <h5><i class="bi bi-folder2-open me-2 text-primary"></i>Projet</h5>
+            <div class="fw-semibold mb-1">{{ projet.nom }}</div>
+            <span class="badge bg-{{ projet.statut|statut_badge }} mb-2">{{ projet.statut }}</span>
+            <p class="small text-muted mb-3">{{ projet.description[:80] }}{% if projet.description|length > 80 %}...{% endif %}</p>
+            <a href="{{ url_for('projets.detail', id=projet._id) }}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-eye me-1"></i>Voir le projet
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

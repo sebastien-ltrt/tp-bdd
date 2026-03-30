@@ -4,9 +4,50 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold mb-0"><i class="bi bi-folder2-open me-2"></i>Projets</h4>
-    <a href="{{ url_for('ajouter_projet') }}" class="btn btn-primary">
+    {% if not current_user.is_membre %}
+    <a href="{{ url_for('projets.ajouter') }}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Nouveau projet
     </a>
+    {% endif %}
+</div>
+
+<!-- Filtres et tri -->
+<div class="section-card mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Statut</label>
+            <select name="statut" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for s in statuts_projet %}
+                <option value="{{ s }}" {% if filtre_statut == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Trier par</label>
+            <select name="tri" class="form-select form-select-sm">
+                <option value="date_debut" {% if tri == 'date_debut' %}selected{% endif %}>Date début</option>
+                <option value="nom" {% if tri == 'nom' %}selected{% endif %}>Nom</option>
+                <option value="avancement" {% if tri == 'avancement' %}selected{% endif %}>Avancement</option>
+                <option value="budget" {% if tri == 'budget' %}selected{% endif %}>Budget</option>
+                <option value="nb_taches" {% if tri == 'nb_taches' %}selected{% endif %}>Nb tâches</option>
+                <option value="statut" {% if tri == 'statut' %}selected{% endif %}>Statut</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-semibold">Ordre</label>
+            <select name="ordre" class="form-select form-select-sm">
+                <option value="asc" {% if ordre == 'asc' %}selected{% endif %}>Croissant</option>
+                <option value="desc" {% if ordre == 'desc' %}selected{% endif %}>Décroissant</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-funnel"></i> Appliquer
+            </button>
+            <a href="{{ url_for('projets.liste') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+    </form>
 </div>
 
 <div class="row g-4">
@@ -16,7 +57,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <h5 class="card-title mb-0">
-                        <a href="{{ url_for('detail_projet', id=p._id) }}" class="text-decoration-none">
+                        <a href="{{ url_for('projets.detail', id=p._id) }}" class="text-decoration-none">
                             {{ p.nom }}
                         </a>
                     </h5>
@@ -43,18 +84,22 @@
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 d-flex gap-2">
-                <a href="{{ url_for('detail_projet', id=p._id) }}" class="btn btn-sm btn-outline-primary flex-fill">
+                <a href="{{ url_for('projets.detail', id=p._id) }}" class="btn btn-sm btn-outline-primary flex-fill">
                     <i class="bi bi-eye"></i> Détail
                 </a>
-                <a href="{{ url_for('modifier_projet', id=p._id) }}" class="btn btn-sm btn-outline-secondary flex-fill">
+                {% if not current_user.is_membre %}
+                <a href="{{ url_for('projets.modifier', id=p._id) }}" class="btn btn-sm btn-outline-secondary flex-fill">
                     <i class="bi bi-pencil"></i> Modifier
                 </a>
-                <form action="{{ url_for('supprimer_projet', id=p._id) }}" method="post"
+                {% if current_user.is_admin %}
+                <form action="{{ url_for('projets.supprimer', id=p._id) }}" method="post"
                       onsubmit="return confirm('Supprimer ce projet et toutes ses tâches ?')">
                     <button class="btn btn-sm btn-outline-danger">
                         <i class="bi bi-trash"></i>
                     </button>
                 </form>
+                {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -65,7 +110,11 @@
 <div class="text-center py-5">
     <i class="bi bi-folder2-open display-1 text-muted"></i>
     <p class="text-muted mt-3">Aucun projet pour le moment.</p>
-    <a href="{{ url_for('ajouter_projet') }}" class="btn btn-primary">Créer un projet</a>
+    {% if not current_user.is_membre %}
+    <a href="{{ url_for('projets.ajouter') }}" class="btn btn-primary">Créer un projet</a>
+    {% endif %}
 </div>
 {% endif %}
+
+<p class="text-muted small mt-3">{{ projets|length }} projet(s) affiché(s)</p>
 {% endblock %}

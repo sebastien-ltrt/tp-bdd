@@ -17,15 +17,27 @@ def _proj_match(proj_ids):
     return {"projet_id": {"$in": proj_ids}}
 
 
-def avancement_par_projet(db, proj_ids=None):
+def _build_task_match(proj_ids=None, extra_match=None):
+    """Construit le filtre de base pour les tâches, avec proj_ids et filtres supplémentaires."""
+    match = {}
+    if proj_ids is not None:
+        match["projet_id"] = {"$in": proj_ids}
+    if extra_match:
+        match.update(extra_match)
+    return match
+
+
+def avancement_par_projet(db, proj_ids=None, extra_match=None):
     """
     Calcule le pourcentage d'avancement par projet.
     Avancement = (nb tâches done / nb tâches total) * 100
     proj_ids : liste d'ObjectId à restreindre (None = tous)
+    extra_match : filtres supplémentaires sur les tâches
     """
     pipeline = []
-    if proj_ids is not None:
-        pipeline.append({"$match": _proj_match(proj_ids)})
+    base = _build_task_match(proj_ids, extra_match)
+    if base:
+        pipeline.append({"$match": base})
     pipeline += [
         # $group : regroupe tous les documents de la collection tasks par projet_id.
         # Pour chaque groupe, on comptabilise le total et on décompose par statut
@@ -85,16 +97,19 @@ def avancement_par_projet(db, proj_ids=None):
     return list(db.tasks.aggregate(pipeline))
 
 
-def taches_en_retard(db, proj_ids=None):
+def taches_en_retard(db, proj_ids=None, extra_match=None):
     """
     Liste toutes les tâches en retard :
     date_echeance < maintenant ET statut != done
     proj_ids : liste d'ObjectId à restreindre (None = tous)
+    extra_match : filtres supplémentaires
     """
     maintenant = datetime.now()
     match = {"statut": {"$ne": "done"}, "date_echeance": {"$lt": maintenant}}
     if proj_ids is not None:
         match["projet_id"] = {"$in": proj_ids}
+    if extra_match:
+        match.update(extra_match)
 
     pipeline = [
         # $match : filtre les documents — équivalent WHERE en SQL.
@@ -144,14 +159,18 @@ def taches_en_retard(db, proj_ids=None):
     return list(db.tasks.aggregate(pipeline))
 
 
-def charge_par_membre(db, proj_ids=None):
+def charge_par_membre(db, proj_ids=None, extra_match=None, role_filtre=None):
     """
     Taux de charge par membre : nombre de tâches actives (in_progress + todo + blocked).
     proj_ids : liste d'ObjectId à restreindre (None = tous)
+    extra_match : filtres supplémentaires
+    role_filtre : restreindre aux membres d'un rôle donné
     """
     match = {"statut": {"$in": ["in_progress", "todo", "blocked"]}}
     if proj_ids is not None:
         match["projet_id"] = {"$in": proj_ids}
+    if extra_match:
+        match.update(extra_match)
 
     pipeline = [
         # $match : on ne prend que les tâches "actives" (non terminées).
@@ -184,12 +203,14 @@ def charge_par_membre(db, proj_ids=None):
         {"$project": {
             "nom_complet": {"$concat": ["$membre.prenom", " ", "$membre.nom"]},
             "role": "$membre.role",
+            "membre_id": "$membre._id",
             "nb_taches_actives": 1,
             "nb_in_progress": 1,
             "nb_todo": 1,
             "nb_blocked": 1,
             "heures_estimees_total": {"$round": ["$heures_estimees_total", 1]}
         }},
+        *([{"$match": {"role": {"$in": role_filtre} if isinstance(role_filtre, list) else role_filtre}}] if role_filtre else []),
         # $sort : du plus chargé au moins chargé.
         {"$sort": {"nb_taches_actives": -1}}
     ]
@@ -197,15 +218,18 @@ def charge_par_membre(db, proj_ids=None):
     return list(db.tasks.aggregate(pipeline))
 
 
-def duree_moyenne_taches_par_projet(db, proj_ids=None):
+def duree_moyenne_taches_par_projet(db, proj_ids=None, extra_match=None):
     """
     Durée moyenne des tâches terminées par projet (en jours).
     Calculée sur les tâches ayant une date_fin_reelle.
     proj_ids : liste d'ObjectId à restreindre (None = tous)
+    extra_match : filtres supplémentaires
     """
     match = {"statut": "done", "date_fin_reelle": {"$ne": None}}
     if proj_ids is not None:
         match["projet_id"] = {"$in": proj_ids}
+    if extra_match:
+        match.update(extra_match)
 
     pipeline = [
         # $match : uniquement les tâches terminées avec une date de fin réelle enregistrée.
@@ -305,13 +329,16 @@ def membres_plus_moins_charges(db, proj_ids=None):
     }
 
 
-def retard_moyen_par_projet(db, proj_ids=None):
+def retard_moyen_par_projet(db, proj_ids=None, extra_match=None):
     """
     Retard moyen par projet (en jours).
     proj_ids : liste d'ObjectId à restreindre (None = tous)
+    extra_match : filtres supplémentaires
     """
     maintenant = datetime.now()
     proj_filter = {"projet_id": {"$in": proj_ids}} if proj_ids is not None else {}
+    if extra_match:
+        proj_filter.update(extra_match)
 
     pipeline = [
         {"$match": {

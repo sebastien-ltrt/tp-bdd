@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}{{ membre.prenom }} {{ membre.nom }} — Gestion de Projets{% endblock %}
+
+{% block content %}
+<!-- En-tête membre -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <a href="{{ url_for('membres.liste') }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left me-1"></i>Membres
+        </a>
+        <h4 class="fw-bold mb-0 mt-1">{{ membre.prenom }} {{ membre.nom }}</h4>
+        <p class="text-muted mb-0">{{ membre.email }}</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-secondary fs-6">{{ membre.role }}</span>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('membres.modifier', id=membre._id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil"></i> Modifier
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Infos -->
+    <div class="col-md-4">
+        <div class="section-card h-100">
+            <h5><i class="bi bi-person-badge me-2 text-primary"></i>Informations</h5>
+            <dl class="mb-0">
+                <dt class="small text-muted">Rôle</dt>
+                <dd>{{ membre.role }}</dd>
+                <dt class="small text-muted">Email</dt>
+                <dd>{{ membre.email }}</dd>
+                <dt class="small text-muted">Date d'embauche</dt>
+                <dd>{{ membre.date_embauche|datefr }}</dd>
+                <dt class="small text-muted">Compétences</dt>
+                <dd>
+                    {% for c in membre.competences %}
+                    <span class="badge bg-light text-dark border me-1 mb-1">{{ c }}</span>
+                    {% endfor %}
+                </dd>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="col-md-8">
+        <div class="row g-3">
+            <div class="col-6 col-lg-3">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value text-primary">{{ stats.total }}</div>
+                    <div class="stat-label">Total tâches</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value text-success">{{ stats.done }}</div>
+                    <div class="stat-label">Terminées</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value text-warning">{{ stats.actives }}</div>
+                    <div class="stat-label">En cours</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value text-danger">{{ stats.retard }}</div>
+                    <div class="stat-label">En retard</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-6">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value text-info">{{ stats.h_estimees }}h</div>
+                    <div class="stat-label">Heures estimées</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-6">
+                <div class="card stat-card text-center p-3">
+                    <div class="stat-value">{{ stats.h_reelles }}h</div>
+                    <div class="stat-label">Heures réelles</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tâches -->
+<div class="section-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0"><i class="bi bi-check2-square me-2 text-primary"></i>Tâches assignées</h5>
+    </div>
+
+    <div class="table-modern">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        {% macro sort_th(label, field) %}
+                            {% set new_ordre = 'desc' if (tri == field and ordre == 'asc') else 'asc' %}
+                            <a href="{{ url_for('membres.detail', id=membre._id, tri=field, ordre=new_ordre) }}"
+                               class="text-decoration-none text-dark d-flex align-items-center gap-1">
+                                {{ label }}
+                                {% if tri == field %}
+                                    <i class="bi bi-arrow-{{ 'up' if ordre == 'asc' else 'down' }}-short text-primary"></i>
+                                {% else %}
+                                    <i class="bi bi-arrow-down-up opacity-25" style="font-size:0.75rem;"></i>
+                                {% endif %}
+                            </a>
+                        {% endmacro %}
+                        <th>{{ sort_th('Titre', 'titre') }}</th>
+                        <th>{{ sort_th('Projet', 'projet') }}</th>
+                        <th class="text-center">{{ sort_th('Statut', 'statut') }}</th>
+                        <th class="text-center">{{ sort_th('Priorité', 'priorite') }}</th>
+                        <th class="text-center">{{ sort_th('Échéance', 'date') }}</th>
+                        <th class="text-center">{{ sort_th('Heures', 'heures') }}</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in taches %}
+                    <tr class="{{ 'table-danger bg-opacity-10' if t.est_en_retard else '' }}">
+                        <td>
+                            <a href="{{ url_for('taches.detail', id=t._id) }}" class="text-decoration-none fw-semibold">
+                                {{ t.titre }}
+                            </a>
+                            {% if t.est_en_retard %}
+                            <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t.projet_oid %}
+                            <a href="{{ url_for('projets.detail', id=t.projet_oid) }}" class="text-decoration-none text-muted small">
+                                {{ t.nom_projet }}
+                            </a>
+                            {% else %}
+                            <small class="text-muted">{{ t.nom_projet or '—' }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ t.statut|statut_badge }}">{{ t.statut }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ t.priorite|priorite_badge }}">{{ t.priorite }}</span>
+                        </td>
+                        <td class="text-center">
+                            <small {% if t.est_en_retard %}class="text-danger fw-bold"{% endif %}>
+                                {{ t.date_echeance|datefr }}
+                            </small>
+                        </td>
+                        <td class="text-center"><small>{{ t.temps_estime_heures }}h</small></td>
+                        <td class="text-center">
+                            <a href="{{ url_for('taches.detail', id=t._id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <p class="text-muted small mt-2">{{ taches|length }} tâche(s)</p>
+</div>
+{% endblock %}
