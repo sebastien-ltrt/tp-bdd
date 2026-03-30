@@ -1,0 +1,219 @@
+{
+  "database": "gestion_projets",
+  "collections": {
+    "members": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["nom", "prenom", "email", "role", "competences", "date_embauche"],
+        "properties": {
+          "_id": {
+            "bsonType": "objectId",
+            "description": "Identifiant unique MongoDB"
+          },
+          "nom": {
+            "bsonType": "string",
+            "description": "Nom de famille du membre"
+          },
+          "prenom": {
+            "bsonType": "string",
+            "description": "Prénom du membre"
+          },
+          "email": {
+            "bsonType": "string",
+            "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "description": "Adresse email valide (unique)"
+          },
+          "role": {
+            "bsonType": "string",
+            "enum": ["developpeur", "designer", "chef_projet", "testeur", "devops", "analyste"],
+            "description": "Rôle dans l'équipe"
+          },
+          "competences": {
+            "bsonType": "array",
+            "items": { "bsonType": "string" },
+            "description": "Liste des compétences"
+          },
+          "date_embauche": {
+            "bsonType": "date",
+            "description": "Date d'embauche"
+          }
+        }
+      },
+      "indexes": [
+        { "key": "email", "unique": true, "name": "idx_email_unique" },
+        { "key": "role", "name": "idx_role" }
+      ]
+    },
+    "projects": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["nom", "description", "date_debut", "date_fin_prevue", "statut", "budget", "chef_projet_id"],
+        "properties": {
+          "_id": {
+            "bsonType": "objectId",
+            "description": "Identifiant unique MongoDB"
+          },
+          "nom": {
+            "bsonType": "string",
+            "description": "Nom du projet"
+          },
+          "description": {
+            "bsonType": "string",
+            "description": "Description du projet"
+          },
+          "date_debut": {
+            "bsonType": "date",
+            "description": "Date de début du projet"
+          },
+          "date_fin_prevue": {
+            "bsonType": "date",
+            "description": "Date de fin prévue"
+          },
+          "date_fin_reelle": {
+            "bsonType": ["date", "null"],
+            "description": "Date de fin réelle (null si en cours)"
+          },
+          "statut": {
+            "bsonType": "string",
+            "enum": ["planifie", "en_cours", "termine", "annule", "en_pause"],
+            "description": "Statut du projet"
+          },
+          "budget": {
+            "bsonType": "double",
+            "minimum": 0,
+            "description": "Budget alloué en euros"
+          },
+          "chef_projet_id": {
+            "bsonType": "objectId",
+            "description": "Référence vers le chef de projet (members._id)"
+          }
+        }
+      },
+      "indexes": [
+        { "key": "statut", "name": "idx_statut" },
+        { "key": "chef_projet_id", "name": "idx_chef_projet" },
+        { "key": "date_fin_prevue", "name": "idx_date_fin_prevue" }
+      ]
+    },
+    "tasks": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["titre", "projet_id", "assignee_id", "statut", "priorite", "date_debut", "date_echeance", "temps_estime_heures"],
+        "properties": {
+          "_id": {
+            "bsonType": "objectId",
+            "description": "Identifiant unique MongoDB"
+          },
+          "titre": {
+            "bsonType": "string",
+            "description": "Titre de la tâche"
+          },
+          "description": {
+            "bsonType": "string",
+            "description": "Description détaillée"
+          },
+          "projet_id": {
+            "bsonType": "objectId",
+            "description": "Référence vers le projet (projects._id)"
+          },
+          "assignee_id": {
+            "bsonType": "objectId",
+            "description": "Référence vers le membre assigné (members._id)"
+          },
+          "statut": {
+            "bsonType": "string",
+            "enum": ["todo", "in_progress", "done", "blocked"],
+            "description": "Statut de la tâche"
+          },
+          "priorite": {
+            "bsonType": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Niveau de priorité"
+          },
+          "date_debut": {
+            "bsonType": "date",
+            "description": "Date de début"
+          },
+          "date_echeance": {
+            "bsonType": "date",
+            "description": "Date d'échéance"
+          },
+          "date_fin_reelle": {
+            "bsonType": ["date", "null"],
+            "description": "Date de fin réelle"
+          },
+          "temps_estime_heures": {
+            "bsonType": "double",
+            "minimum": 0,
+            "description": "Temps estimé en heures"
+          },
+          "temps_reel_heures": {
+            "bsonType": ["double", "null"],
+            "minimum": 0,
+            "description": "Temps réellement passé en heures"
+          }
+        }
+      },
+      "indexes": [
+        { "key": "projet_id", "name": "idx_projet" },
+        { "key": "assignee_id", "name": "idx_assignee" },
+        { "key": "statut", "name": "idx_task_statut" },
+        { "key": "date_echeance", "name": "idx_echeance" },
+        { "keys": [["statut", 1], ["date_echeance", 1]], "name": "idx_statut_echeance", "description": "Index composé pour les tâches en retard" },
+        { "keys": [["assignee_id", 1], ["statut", 1]], "name": "idx_assignee_statut", "description": "Index composé pour la charge par membre" }
+      ]
+    },
+    "users": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["username", "password_hash", "email", "app_role", "is_active", "created_at"],
+        "properties": {
+          "_id": {
+            "bsonType": "objectId",
+            "description": "Identifiant unique MongoDB"
+          },
+          "username": {
+            "bsonType": "string",
+            "description": "Identifiant de connexion (unique)"
+          },
+          "password_hash": {
+            "bsonType": "string",
+            "description": "Hash Werkzeug du mot de passe"
+          },
+          "email": {
+            "bsonType": "string",
+            "description": "Adresse email (unique)"
+          },
+          "app_role": {
+            "bsonType": "string",
+            "enum": ["admin", "chef_projet", "membre"],
+            "description": "Rôle applicatif — contrôle d'accès"
+          },
+          "member_id": {
+            "bsonType": ["objectId", "null"],
+            "description": "Référence vers le membre d'équipe lié (members._id) — null pour admin"
+          },
+          "is_active": {
+            "bsonType": "bool",
+            "description": "Compte actif ou désactivé"
+          },
+          "created_at": {
+            "bsonType": "date",
+            "description": "Date de création du compte"
+          }
+        }
+      },
+      "indexes": [
+        { "key": "username", "unique": true, "name": "idx_username_unique" },
+        { "key": "email", "unique": true, "name": "idx_user_email_unique" },
+        { "key": "member_id", "name": "idx_user_member" }
+      ]
+    }
+  },
+  "references": {
+    "projects.chef_projet_id": "members._id",
+    "tasks.projet_id": "projects._id",
+    "tasks.assignee_id": "members._id",
+    "users.member_id": "members._id"
+  }
+}

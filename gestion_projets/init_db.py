@@ -209,6 +209,54 @@ def creer_collection_tasks(db):
         print("  ✓ Collection 'tasks' mise à jour (existait déjà).")
 
 
+def creer_collection_users(db):
+    """Crée la collection 'users' pour l'authentification."""
+    schema = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["username", "password_hash", "email", "app_role", "is_active", "created_at"],
+            "properties": {
+                "username": {
+                    "bsonType": "string",
+                    "description": "Identifiant de connexion (unique)"
+                },
+                "password_hash": {
+                    "bsonType": "string",
+                    "description": "Hash bcrypt du mot de passe"
+                },
+                "email": {
+                    "bsonType": "string",
+                    "description": "Adresse email"
+                },
+                "app_role": {
+                    "bsonType": "string",
+                    "enum": ["admin", "chef_projet", "membre"],
+                    "description": "Rôle applicatif (contrôle d'accès)"
+                },
+                "member_id": {
+                    "bsonType": ["objectId", "null"],
+                    "description": "Référence vers le membre d'équipe lié (members._id)"
+                },
+                "is_active": {
+                    "bsonType": "bool",
+                    "description": "Compte actif ou désactivé"
+                },
+                "created_at": {
+                    "bsonType": "date",
+                    "description": "Date de création du compte"
+                }
+            }
+        }
+    }
+
+    try:
+        db.create_collection("users", validator=schema)
+        print("  ✓ Collection 'users' créée avec validation.")
+    except CollectionInvalid:
+        db.command("collMod", "users", validator=schema)
+        print("  ✓ Collection 'users' mise à jour (existait déjà).")
+
+
 def creer_index(db):
     """Crée les index pour optimiser les requêtes fréquentes."""
     # Members
@@ -239,6 +287,12 @@ def creer_index(db):
     )
     print("  ✓ Index sur 'tasks' créés (projet, assignee, statut, échéance, composés).")
 
+    # Users
+    db.users.create_index("username", unique=True, name="idx_username_unique")
+    db.users.create_index("email", unique=True, name="idx_user_email_unique")
+    db.users.create_index("member_id", name="idx_user_member")
+    print("  ✓ Index sur 'users' créés (username unique, email unique, member_id).")
+
 
 def initialiser():
     """Point d'entrée : initialise toute la base de données."""
@@ -252,6 +306,7 @@ def initialiser():
     creer_collection_members(db)
     creer_collection_projects(db)
     creer_collection_tasks(db)
+    creer_collection_users(db)
 
     print("\n--- Création des index ---")
     creer_index(db)

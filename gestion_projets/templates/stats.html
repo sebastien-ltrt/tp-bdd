@@ -8,7 +8,12 @@
     <!-- 1. Avancement par projet -->
     <div class="col-lg-6">
         <div class="section-card h-100">
-            <h5><i class="bi bi-graph-up text-success"></i> Avancement par projet</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-graph-up text-success"></i> Avancement par projet</h5>
+                <a href="{{ url_for('export_avancement_csv') }}" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-download me-1"></i>CSV
+                </a>
+            </div>
             {% for a in avancements %}
             <div class="mb-3">
                 <div class="d-flex justify-content-between mb-1">
@@ -68,7 +73,12 @@
         <div class="section-card">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> Tâches en retard ({{ retards|length }})</h5>
-                <a href="{{ url_for('taches_en_retard_page') }}" class="btn btn-sm btn-outline-danger">Détail</a>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('taches_en_retard_page') }}" class="btn btn-sm btn-outline-danger">Détail</a>
+                    <a href="{{ url_for('export_retards_csv') }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-download me-1"></i>CSV
+                    </a>
+                </div>
             </div>
             {% if retards %}
             <div class="table-responsive mt-3">
@@ -130,7 +140,12 @@
     <!-- 5. Charge par membre -->
     <div class="col-lg-6">
         <div class="section-card">
-            <h5><i class="bi bi-people text-primary"></i> Charge par membre</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-people text-primary"></i> Charge par membre</h5>
+                <a href="{{ url_for('export_charge_csv') }}" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-download me-1"></i>CSV
+                </a>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm">
                     <thead>

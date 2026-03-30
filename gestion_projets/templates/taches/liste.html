@@ -40,6 +40,15 @@
             </select>
         </div>
         <div class="col-auto">
+            <label class="form-label small fw-semibold">Membre</label>
+            <select name="assignee_id" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for m in membres %}
+                <option value="{{ m._id }}" {% if filtre_membre == m._id|string %}selected{% endif %}>{{ m.prenom }} {{ m.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">
                 <i class="bi bi-funnel"></i> Filtrer
             </button>

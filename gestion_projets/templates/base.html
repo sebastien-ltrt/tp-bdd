@@ -198,6 +198,30 @@
             Gestion Projets
         </div>
 
+        {% if current_user.is_authenticated %}
+        <!-- Utilisateur connecté -->
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.25rem;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:white;flex-shrink:0;">
+                    {{ current_user.username[0]|upper }}
+                </div>
+                <div style="overflow:hidden;">
+                    <div style="font-size:0.85rem;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        {{ current_user.username }}
+                    </div>
+                    <div style="font-size:0.7rem;color:#64748b;">
+                        {% if current_user.is_admin %}
+                            <span style="color:#f87171;">● admin</span>
+                        {% elif current_user.is_chef %}
+                            <span style="color:#60a5fa;">● chef de projet</span>
+                        {% else %}
+                            <span style="color:#94a3b8;">● membre</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="nav-section">Principal</div>
         <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i> Dashboard
@@ -205,22 +229,36 @@
 
         <div class="nav-section">Gestion</div>
         <a href="{{ url_for('liste_projets') }}" class="nav-link {% if 'projet' in request.endpoint|default('') %}active{% endif %}">
-            <i class="bi bi-folder2-open"></i> Projets
+            <i class="bi bi-folder2-open"></i>
+            {% if current_user.is_membre %}Mes Projets{% else %}Projets{% endif %}
         </a>
         <a href="{{ url_for('liste_taches') }}" class="nav-link {% if request.endpoint == 'liste_taches' %}active{% endif %}">
-            <i class="bi bi-check2-square"></i> Tâches
+            <i class="bi bi-check2-square"></i>
+            {% if current_user.is_membre %}Mes Tâches{% else %}Tâches{% endif %}
         </a>
         <a href="{{ url_for('taches_en_retard_page') }}" class="nav-link {% if request.endpoint == 'taches_en_retard_page' %}active{% endif %}">
             <i class="bi bi-exclamation-triangle"></i> En retard
         </a>
+        {% if not current_user.is_membre %}
         <a href="{{ url_for('liste_membres') }}" class="nav-link {% if 'membre' in request.endpoint|default('') %}active{% endif %}">
             <i class="bi bi-people"></i> Membres
         </a>
+        {% endif %}
 
+        {% if not current_user.is_membre %}
         <div class="nav-section">Analyse</div>
         <a href="{{ url_for('statistiques') }}" class="nav-link {% if request.endpoint == 'statistiques' %}active{% endif %}">
             <i class="bi bi-bar-chart-line"></i> Statistiques
         </a>
+        {% endif %}
+
+        <!-- Déconnexion -->
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:1rem 1.25rem;border-top:1px solid rgba(255,255,255,0.08);">
+            <a href="{{ url_for('logout') }}" class="nav-link" style="color:#ef4444;">
+                <i class="bi bi-box-arrow-left"></i> Déconnexion
+            </a>
+        </div>
+        {% endif %}
     </nav>
 
     <!-- Contenu principal -->

@@ -10,13 +10,26 @@ from pymongo import MongoClient
 from init_db import get_database
 
 
-def avancement_par_projet(db):
+def _proj_match(proj_ids):
+    """Retourne un stage $match pour filtrer par projet_id, ou {} si aucun filtre."""
+    if proj_ids is None:
+        return {}
+    return {"projet_id": {"$in": proj_ids}}
+
+
+def avancement_par_projet(db, proj_ids=None):
     """
     Calcule le pourcentage d'avancement par projet.
     Avancement = (nb tâches done / nb tâches total) * 100
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
-    pipeline = [
-        # Regrouper les tâches par projet
+    pipeline = []
+    if proj_ids is not None:
+        pipeline.append({"$match": _proj_match(proj_ids)})
+    pipeline += [
+        # $group : regroupe tous les documents de la collection tasks par projet_id.
+        # Pour chaque groupe, on comptabilise le total et on décompose par statut
+        # en utilisant $cond (opérateur ternaire) : si statut == "done" → +1, sinon → +0.
         {"$group": {
             "_id": "$projet_id",
             "total_taches": {"$sum": 1},
@@ -33,15 +46,20 @@ def avancement_par_projet(db):
                 "$sum": {"$cond": [{"$eq": ["$statut", "todo"]}, 1, 0]}
             }
         }},
-        # Jointure avec la collection projects pour le nom
+        # $lookup : jointure (équivalent SQL JOIN) entre tasks et projects.
+        # localField "_id" (= projet_id groupé) est mis en correspondance avec
+        # foreignField "_id" de la collection "projects". Résultat dans "projet".
         {"$lookup": {
             "from": "projects",
             "localField": "_id",
             "foreignField": "_id",
             "as": "projet"
         }},
+        # $unwind : déroule le tableau "projet" (issu du $lookup) en un seul document.
+        # Sans $unwind, "projet" serait un tableau avec un seul élément.
         {"$unwind": "$projet"},
-        # Calcul du pourcentage
+        # $project : définit les champs à conserver/calculer dans le résultat.
+        # $round arrondit le résultat de $divide * 100 à 1 décimale.
         {"$project": {
             "nom_projet": "$projet.nom",
             "statut_projet": "$projet.statut",
@@ -60,25 +78,28 @@ def avancement_par_projet(db):
                 ]
             }
         }},
-        {"$sort": {"pourcentage_avancement": -1}}
+        # $sort : tri décroissant par pourcentage (les projets les plus avancés en premier).
+        {"$sort": {"pourcentage_avancement": -1}},
     ]
 
     return list(db.tasks.aggregate(pipeline))
 
 
-def taches_en_retard(db):
+def taches_en_retard(db, proj_ids=None):
     """
     Liste toutes les tâches en retard :
     date_echeance < maintenant ET statut != done
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
     maintenant = datetime.now()
+    match = {"statut": {"$ne": "done"}, "date_echeance": {"$lt": maintenant}}
+    if proj_ids is not None:
+        match["projet_id"] = {"$in": proj_ids}
 
     pipeline = [
-        {"$match": {
-            "statut": {"$ne": "done"},
-            "date_echeance": {"$lt": maintenant}
-        }},
-        # Jointure pour le nom du projet
+        # $match : filtre les documents — équivalent WHERE en SQL.
+        {"$match": match},
+        # $lookup : jointure avec projects pour récupérer le nom du projet.
         {"$lookup": {
             "from": "projects",
             "localField": "projet_id",
@@ -86,7 +107,8 @@ def taches_en_retard(db):
             "as": "projet"
         }},
         {"$unwind": "$projet"},
-        # Jointure pour le nom du membre assigné
+        # $lookup : deuxième jointure pour récupérer le nom du membre assigné.
+        # MongoDB permet plusieurs $lookup dans un même pipeline.
         {"$lookup": {
             "from": "members",
             "localField": "assignee_id",
@@ -94,7 +116,10 @@ def taches_en_retard(db):
             "as": "assignee"
         }},
         {"$unwind": "$assignee"},
-        # Calcul du retard en jours
+        # $project : calcul du retard en jours.
+        # $subtract entre deux dates retourne la différence en millisecondes.
+        # On divise par 86 400 000 (ms dans 1 jour) pour obtenir des jours.
+        # $concat assemble prénom + " " + nom pour l'affichage.
         {"$project": {
             "titre": 1,
             "statut": 1,
@@ -112,20 +137,27 @@ def taches_en_retard(db):
                 ]
             }
         }},
+        # $sort : les tâches les plus en retard en premier.
         {"$sort": {"jours_retard": -1}}
     ]
 
     return list(db.tasks.aggregate(pipeline))
 
 
-def charge_par_membre(db):
+def charge_par_membre(db, proj_ids=None):
     """
     Taux de charge par membre : nombre de tâches actives (in_progress + todo + blocked).
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
+    match = {"statut": {"$in": ["in_progress", "todo", "blocked"]}}
+    if proj_ids is not None:
+        match["projet_id"] = {"$in": proj_ids}
+
     pipeline = [
-        # Filtrer les tâches actives (non terminées)
-        {"$match": {"statut": {"$in": ["in_progress", "todo", "blocked"]}}},
-        # Regrouper par membre
+        # $match : on ne prend que les tâches "actives" (non terminées).
+        {"$match": match},
+        # $group : regroupement par membre (assignee_id).
+        # On cumule le total de tâches actives et on décompose par statut.
         {"$group": {
             "_id": "$assignee_id",
             "nb_taches_actives": {"$sum": 1},
@@ -138,9 +170,10 @@ def charge_par_membre(db):
             "nb_blocked": {
                 "$sum": {"$cond": [{"$eq": ["$statut", "blocked"]}, 1, 0]}
             },
+            # $sum sur un champ numérique : additionne les heures estimées.
             "heures_estimees_total": {"$sum": "$temps_estime_heures"}
         }},
-        # Jointure avec members
+        # $lookup : jointure avec members pour obtenir nom, prénom, rôle.
         {"$lookup": {
             "from": "members",
             "localField": "_id",
@@ -157,24 +190,28 @@ def charge_par_membre(db):
             "nb_blocked": 1,
             "heures_estimees_total": {"$round": ["$heures_estimees_total", 1]}
         }},
+        # $sort : du plus chargé au moins chargé.
         {"$sort": {"nb_taches_actives": -1}}
     ]
 
     return list(db.tasks.aggregate(pipeline))
 
 
-def duree_moyenne_taches_par_projet(db):
+def duree_moyenne_taches_par_projet(db, proj_ids=None):
     """
     Durée moyenne des tâches terminées par projet (en jours).
     Calculée sur les tâches ayant une date_fin_reelle.
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
+    match = {"statut": "done", "date_fin_reelle": {"$ne": None}}
+    if proj_ids is not None:
+        match["projet_id"] = {"$in": proj_ids}
+
     pipeline = [
-        # Uniquement les tâches terminées avec date de fin
-        {"$match": {
-            "statut": "done",
-            "date_fin_reelle": {"$ne": None}
-        }},
-        # Calcul de la durée en jours
+        # $match : uniquement les tâches terminées avec une date de fin réelle enregistrée.
+        {"$match": match},
+        # $project intermédiaire : calcule la durée en jours pour chaque tâche
+        # avant le $group. Cela évite de refaire le calcul dans le $group.
         {"$project": {
             "projet_id": 1,
             "duree_jours": {
@@ -184,7 +221,8 @@ def duree_moyenne_taches_par_projet(db):
                 ]
             }
         }},
-        # Regroupement par projet
+        # $group : calcule moyenne, min, max de la durée par projet.
+        # $avg, $min, $max sont des accumulateurs de regroupement MongoDB.
         {"$group": {
             "_id": "$projet_id",
             "duree_moyenne_jours": {"$avg": "$duree_jours"},
@@ -192,7 +230,7 @@ def duree_moyenne_taches_par_projet(db):
             "duree_max_jours": {"$max": "$duree_jours"},
             "nb_taches_terminees": {"$sum": 1}
         }},
-        # Jointure avec projects
+        # $lookup : récupération du nom du projet pour l'affichage.
         {"$lookup": {
             "from": "projects",
             "localField": "_id",
@@ -207,19 +245,24 @@ def duree_moyenne_taches_par_projet(db):
             "duree_max_jours": {"$round": ["$duree_max_jours", 1]},
             "nb_taches_terminees": 1
         }},
+        # $sort : du projet avec les tâches les plus courtes au plus long.
         {"$sort": {"duree_moyenne_jours": 1}}
     ]
 
     return list(db.tasks.aggregate(pipeline))
 
 
-def membres_plus_moins_charges(db):
+def membres_plus_moins_charges(db, proj_ids=None):
     """
     Identifie les membres les plus et les moins chargés.
     Inclut TOUS les membres, même ceux sans tâches actives.
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
+    proj_cond = []
+    if proj_ids is not None:
+        proj_cond = [{"$in": ["$projet_id", proj_ids]}]
+
     pipeline = [
-        # Partir de la collection members pour inclure tout le monde
         {"$lookup": {
             "from": "tasks",
             "let": {"member_id": "$_id"},
@@ -228,18 +271,22 @@ def membres_plus_moins_charges(db):
                     "$expr": {
                         "$and": [
                             {"$eq": ["$assignee_id", "$$member_id"]},
-                            {"$in": ["$statut", ["in_progress", "todo", "blocked"]]}
+                            {"$in": ["$statut", ["in_progress", "todo", "blocked"]]},
+                            *proj_cond,
                         ]
                     }
                 }}
             ],
             "as": "taches_actives"
         }},
+        # $project : $size retourne le nombre d'éléments dans le tableau "taches_actives".
+        # Les membres sans tâches actives auront taches_actives = [] → $size = 0.
         {"$project": {
             "nom_complet": {"$concat": ["$prenom", " ", "$nom"]},
             "role": 1,
             "nb_taches_actives": {"$size": "$taches_actives"}
         }},
+        # $sort : décroissant pour avoir les plus chargés en tête du tableau.
         {"$sort": {"nb_taches_actives": -1}}
     ]
 
@@ -258,27 +305,27 @@ def membres_plus_moins_charges(db):
     }
 
 
-def retard_moyen_par_projet(db):
+def retard_moyen_par_projet(db, proj_ids=None):
     """
     Retard moyen par projet (en jours).
-    Calcule la différence entre la date de fin réelle et la date d'échéance
-    pour les tâches terminées en retard, et entre maintenant et la date
-    d'échéance pour les tâches non terminées en retard.
+    proj_ids : liste d'ObjectId à restreindre (None = tous)
     """
     maintenant = datetime.now()
+    proj_filter = {"projet_id": {"$in": proj_ids}} if proj_ids is not None else {}
 
     pipeline = [
-        # Tâches en retard : terminées après l'échéance OU non terminées avec échéance passée
         {"$match": {
+            **proj_filter,
             "$or": [
-                # Terminées en retard
                 {"statut": "done", "date_fin_reelle": {"$ne": None},
                  "$expr": {"$gt": ["$date_fin_reelle", "$date_echeance"]}},
-                # Non terminées avec échéance passée
                 {"statut": {"$ne": "done"}, "date_echeance": {"$lt": maintenant}}
             ]
         }},
-        # Calcul du retard
+        # $project avec $cond (ternaire) : selon le statut de la tâche, on calcule
+        # le retard différemment :
+        #   - done → date_fin_reelle - date_echeance
+        #   - autres → maintenant - date_echeance
         {"$project": {
             "projet_id": 1,
             "titre": 1,
@@ -300,14 +347,14 @@ def retard_moyen_par_projet(db):
                 }
             }
         }},
-        # Regroupement par projet
+        # $group : agrège les retards par projet pour obtenir moyenne et maximum.
         {"$group": {
             "_id": "$projet_id",
             "retard_moyen_jours": {"$avg": "$retard_jours"},
             "retard_max_jours": {"$max": "$retard_jours"},
             "nb_taches_en_retard": {"$sum": 1}
         }},
-        # Jointure
+        # $lookup + $unwind : jointure standard pour récupérer le nom du projet.
         {"$lookup": {
             "from": "projects",
             "localField": "_id",
@@ -321,6 +368,7 @@ def retard_moyen_par_projet(db):
             "retard_max_jours": {"$round": ["$retard_max_jours", 1]},
             "nb_taches_en_retard": 1
         }},
+        # $sort : les projets avec le plus grand retard moyen en premier.
         {"$sort": {"retard_moyen_jours": -1}}
     ]
 

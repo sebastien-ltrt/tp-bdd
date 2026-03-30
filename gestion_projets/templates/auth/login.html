@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion — Gestion de Projets</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        .login-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 420px;
+        }
+        .login-logo {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.25rem;
+            font-size: 1.6rem;
+            color: white;
+        }
+        .login-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-align: center;
+            color: #0f172a;
+            margin-bottom: 0.25rem;
+        }
+        .login-subtitle {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .form-label {
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        .form-control {
+            border-radius: 8px;
+            border: 1.5px solid #e2e8f0;
+            padding: 0.65rem 0.9rem;
+        }
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            padding: 0.7rem;
+            width: 100%;
+            transition: opacity 0.15s;
+        }
+        .btn-login:hover { opacity: 0.9; color: white; }
+        .role-legend {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        .role-legend h6 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-right: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-logo"><i class="bi bi-kanban"></i></div>
+        <div class="login-title">Gestion de Projets</div>
+        <div class="login-subtitle">Connectez-vous pour accéder à votre espace</div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert" style="font-size:0.875rem">
+                {{ message }}
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-3">
+                <label for="username" class="form-label">Nom d'utilisateur</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0" style="border-radius:8px 0 0 8px; border:1.5px solid #e2e8f0">
+                        <i class="bi bi-person text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0" id="username" name="username"
+                           placeholder="Votre identifiant" required autofocus
+                           style="border-radius:0 8px 8px 0">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Mot de passe</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0" style="border-radius:8px 0 0 8px; border:1.5px solid #e2e8f0">
+                        <i class="bi bi-lock text-muted"></i>
+                    </span>
+                    <input type="password" class="form-control border-start-0" id="password" name="password"
+                           placeholder="Votre mot de passe" required
+                           style="border-radius:0 8px 8px 0">
+                </div>
+            </div>
+            <div class="mb-4 d-flex align-items-center gap-2">
+                <input class="form-check-input m-0" type="checkbox" id="remember" name="remember">
+                <label class="form-check-label text-muted" for="remember" style="font-size:0.875rem">
+                    Se souvenir de moi
+                </label>
+            </div>
+            <button type="submit" class="btn btn-login">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter
+            </button>
+        </form>
+
+        <div class="role-legend">
+            <h6>Niveaux d'accès</h6>
+            <div class="mb-1">
+                <span class="role-badge bg-danger text-white">admin</span>
+                Accès complet à toute l'application
+            </div>
+            <div class="mb-1">
+                <span class="role-badge bg-primary text-white">chef_projet</span>
+                Ses projets + tâches + consultation membres
+            </div>
+            <div>
+                <span class="role-badge bg-secondary text-white">membre</span>
+                Uniquement ses tâches assignées
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
