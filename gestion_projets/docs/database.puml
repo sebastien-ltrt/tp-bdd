@@ -1,0 +1,214 @@
+@startuml Database_Schema
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #888888
+skinparam ArrowColor #444444
+skinparam defaultFontSize 13
+skinparam classAttributeIconSize 0
+
+title Schéma Base de Données — MongoDB gestion_projets
+
+' ══════════════════════════════════════════════════════════════════
+'  COLLECTIONS
+' ══════════════════════════════════════════════════════════════════
+
+class "members" as MEMBERS << (C,#4A90D9) Collection >> {
+  + _id : ObjectId <<PK>>
+  --
+  nom : String [required]
+  prenom : String [required]
+  email : String [required, unique]
+  role : String [required]
+  .. enum: developpeur | designer ..
+  .. chef_projet | testeur | devops | analyste ..
+  competences : String[] [required]
+  date_embauche : Date [required]
+  --
+  idx_email_unique (unique)
+  idx_role
+}
+
+class "projects" as PROJECTS << (C,#4A90D9) Collection >> {
+  + _id : ObjectId <<PK>>
+  --
+  nom : String [required]
+  description : String [required]
+  date_debut : Date [required]
+  date_fin_prevue : Date [required]
+  date_fin_reelle : Date | null
+  statut : String [required]
+  .. enum: planifie | en_cours ..
+  .. termine | annule | en_pause ..
+  budget : Double [required, >= 0]
+  chef_projet_id : ObjectId [required] <<FK>>
+  --
+  idx_statut
+  idx_chef_projet
+  idx_date_fin_prevue
+}
+
+class "tasks" as TASKS << (C,#4A90D9) Collection >> {
+  + _id : ObjectId <<PK>>
+  --
+  titre : String [required]
+  description : String
+  projet_id : ObjectId [required] <<FK>>
+  assignee_id : ObjectId [required] <<FK>>
+  statut : String [required]
+  .. enum: todo | in_progress | done | blocked ..
+  priorite : String [required]
+  .. enum: low | medium | high | critical ..
+  date_debut : Date [required]
+  date_echeance : Date [required]
+  date_fin_reelle : Date | null
+  temps_estime_heures : Double [required, >= 0]
+  temps_reel_heures : Double | null [>= 0]
+  --
+  idx_projet
+  idx_assignee
+  idx_task_statut
+  idx_echeance
+  idx_statut_echeance (composé)
+  idx_assignee_statut (composé)
+}
+
+class "users" as USERS << (C,#4A90D9) Collection >> {
+  + _id : ObjectId <<PK>>
+  --
+  username : String [required, unique]
+  password_hash : String [required]
+  email : String [required, unique]
+  app_role : String [required]
+  .. enum: admin | chef_projet | membre ..
+  member_id : ObjectId | null <<FK>>
+  is_active : Boolean [required]
+  created_at : Date [required]
+  --
+  idx_username_unique (unique)
+  idx_user_email_unique (unique)
+  idx_user_member
+}
+
+' ══════════════════════════════════════════════════════════════════
+'  VUES (read-only, recalculées à chaque requête)
+' ══════════════════════════════════════════════════════════════════
+
+class "vue_taches_en_retard" as V_RETARD << (V,#E8A838) Vue >> {
+  --
+  titre
+  statut
+  priorite
+  date_echeance
+  jours_retard  ($$NOW - date_echeance)
+  nom_projet    ($lookup projects)
+  assignee_nom  ($lookup members)
+  --
+  filtre: statut != done\nAND date_echeance < $$NOW
+}
+
+class "vue_avancement_projets" as V_AVANCE << (V,#E8A838) Vue >> {
+  --
+  nom_projet
+  statut_projet
+  total_taches       ($group)
+  taches_terminees
+  taches_en_cours
+  taches_todo
+  taches_bloquees
+  pourcentage_avancement
+  heures_estimees_total
+  heures_reelles_total
+  --
+  basedon: tasks → $lookup projects
+}
+
+class "vue_charge_membres" as V_CHARGE << (V,#E8A838) Vue >> {
+  --
+  nom_complet
+  role
+  email
+  nb_taches_actives
+  nb_in_progress
+  nb_todo
+  nb_blocked
+  heures_estimees_total
+  --
+  basedon: members → $lookup tasks
+}
+
+class "vue_dashboard" as V_DASH << (V,#E8A838) Vue >> {
+  --
+  total_projets
+  total_membres
+  total_taches
+  taches_done
+  taches_en_retard
+  --
+  $facet (aggregation multi-pipeline)
+}
+
+' ══════════════════════════════════════════════════════════════════
+'  PIPELINES D'AGRÉGATION (aggregations.py)
+' ══════════════════════════════════════════════════════════════════
+
+class "Pipelines d'agrégation" as AGG << (A,#7CB87C) aggregations.py >> {
+  --
+  avancement_par_projet()
+  taches_en_retard()
+  charge_par_membre()
+  duree_moyenne_taches_par_projet()
+  membres_plus_moins_charges()
+  retard_moyen_par_projet()
+}
+
+' ══════════════════════════════════════════════════════════════════
+'  RELATIONS
+' ══════════════════════════════════════════════════════════════════
+
+MEMBERS "1" <--o "0..*" PROJECTS : chef_projet_id
+MEMBERS "1" <--o "0..*" TASKS : assignee_id
+PROJECTS "1" <--o "0..*" TASKS : projet_id
+MEMBERS "0..1" <--o "0..*" USERS : member_id
+
+' Vues basées sur les collections
+TASKS ..> V_RETARD : $match + $lookup
+TASKS ..> V_AVANCE : $group + $lookup
+MEMBERS ..> V_CHARGE : $lookup tasks
+TASKS ..> V_DASH : $facet
+PROJECTS ..> V_AVANCE : $lookup
+PROJECTS ..> V_RETARD : $lookup
+
+' Pipelines
+TASKS ..> AGG : source principale\n$lookup members\n$lookup projects
+MEMBERS ..> AGG
+PROJECTS ..> AGG
+
+' ══════════════════════════════════════════════════════════════════
+'  NOTES
+' ══════════════════════════════════════════════════════════════════
+
+note top of TASKS
+  Architecture : RÉFÉRENCEMENT (pas d'imbrication)
+  Raisons :
+  • Volume élevé (50+ tâches / projet → limite 16 Mo)
+  • Requêtes transversales indépendantes du projet
+  • Mises à jour de statut fréquentes et simples
+  • $lookup plus performant que sous-documents
+end note
+
+note top of USERS
+  users.app_role contrôle l'accès applicatif
+  (admin / chef_projet / membre)
+  ≠ members.role qui est le rôle métier
+  (developpeur / designer / ...)
+end note
+
+note right of V_RETARD
+  Vues read-only créées avec
+  db.create_collection(viewOn=...)
+  Recalculées dynamiquement
+  Utilisent $$NOW pour l'instant courant
+end note
+
+@enduml

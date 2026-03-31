@@ -1,0 +1,128 @@
+@startuml Architecture_Application
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam defaultFontSize 13
+
+title Architecture — Application Gestion de Projets (Flask + MongoDB)
+
+' ── Navigateur ───────────────────────────────────────────────────────
+actor Utilisateur as U
+node "Navigateur" as Browser {
+    component "Bootstrap 5\nChart.js\nFont Awesome" as FE
+}
+
+' ── Application Flask ─────────────────────────────────────────────────
+package "Application Flask (app.py)" {
+
+    package "Couche Présentation\n(templates/)" {
+        component "base.html\n(sidebar, dark/light theme)" as BASE
+        component "dashboard.html\nKPIs + graphes" as DASH_T
+        component "projets/*.html\nliste / detail / form" as PROJ_T
+        component "taches/*.html\nliste / detail / form / retard" as TACHE_T
+        component "membres/*.html\nliste / detail / form" as MEMBRE_T
+        component "stats.html\nChart.js visualisations" as STATS_T
+        component "recherche.html" as RECH_T
+        component "auth/login.html" as AUTH_T
+    }
+
+    package "Couche Contrôleur\n(controllers/)" {
+        component "auth.py\nGET /login\nPOST /login\nGET /logout" as AUTH_C
+        component "dashboard.py\nGET /" as DASH_C
+        component "projets.py\nGET /projets\nGET /projets/<id>\nPOST /projets/ajouter\nPOST /projets/<id>/modifier\nPOST /projets/<id>/supprimer" as PROJ_C
+        component "taches.py\nGET /taches\nGET /taches/<id>\nPOST /taches/ajouter\nPOST /taches/<id>/modifier\nPOST /taches/<id>/statut\nPOST /taches/<id>/supprimer\nGET /taches/retard" as TACHE_C
+        component "membres.py\nGET /membres\nGET /membres/<id>\nPOST /membres/ajouter\nPOST /membres/<id>/modifier\nPOST /membres/<id>/supprimer" as MEMBRE_C
+        component "stats.py\nGET /stats" as STATS_C
+        component "recherche.py\nGET /recherche" as RECH_C
+        component "exports.py\nGET /export/avancement.csv\nGET /export/retards.csv\nGET /export/charge.csv" as EXPORT_C
+        component "utils.py\nrequire_role()\nget_projet_filter()\nget_tache_filter()\nregister_filters()" as UTILS
+    }
+
+    package "Couche Modèle\n(models/)" {
+        component "database.py\nMongoClient singleton\ngestion_projets DB" as DB_MOD
+        component "user.py\nUser (Flask-Login)\nget_by_id()\nget_by_username()" as USER_MOD
+        component "projet.py\nliste() / get_by_id()\ncreer() / modifier()\nsupprimer()" as PROJ_MOD
+        component "tache.py\nliste() / get_by_id()\nget_with_relations()\ncreer() / modifier()\nchanger_statut()\nsupprimer()" as TACHE_MOD
+        component "membre.py\nliste() / get_by_id()\ntaches_du_membre()\ncreer() / modifier()\nsupprimer()" as MEMBRE_MOD
+    }
+
+    component "aggregations.py\navancement_par_projet()\ntaches_en_retard()\ncharge_par_membre()\nduree_moyenne_taches_par_projet()\nmembres_plus_moins_charges()\nretard_moyen_par_projet()" as AGG
+
+    package "Infrastructure Auth" {
+        component "Flask-Login\nLoginManager\nsession utilisateur" as FL
+        component "MongoJSONProvider\nObjectId → str\ndatetime → ISO" as JSON_P
+    }
+}
+
+' ── Base de données MongoDB ───────────────────────────────────────────
+database "MongoDB\ngestion_projets" as MONGO {
+    collections "Collections\nmembers / projects\ntasks / users" as COLS
+    collections "Vues\nvue_taches_en_retard\nvue_avancement_projets\nvue_charge_membres\nvue_dashboard" as VIEWS
+}
+
+' ── Flux HTTP ──────────────────────────────────────────────────────────
+U --> Browser : HTTP Request
+Browser --> AUTH_C : GET/POST /login
+Browser --> DASH_C : GET /
+Browser --> PROJ_C : /projets/**
+Browser --> TACHE_C : /taches/**
+Browser --> MEMBRE_C : /membres/**
+Browser --> STATS_C : GET /stats
+Browser --> RECH_C : GET /recherche
+Browser --> EXPORT_C : GET /export/*.csv
+
+' ── Contrôleurs → Templates ───────────────────────────────────────────
+AUTH_C --> AUTH_T : render
+DASH_C --> DASH_T : render
+PROJ_C --> PROJ_T : render
+TACHE_C --> TACHE_T : render
+MEMBRE_C --> MEMBRE_T : render
+STATS_C --> STATS_T : render
+RECH_C --> RECH_T : render
+
+' ── Contrôleurs → Modèles ─────────────────────────────────────────────
+AUTH_C --> USER_MOD
+DASH_C --> DB_MOD
+DASH_C --> AGG
+PROJ_C --> PROJ_MOD
+TACHE_C --> TACHE_MOD
+TACHE_C --> AGG
+MEMBRE_C --> MEMBRE_MOD
+STATS_C --> AGG
+RECH_C --> DB_MOD
+EXPORT_C --> AGG
+
+' ── Modèles → MongoDB ─────────────────────────────────────────────────
+DB_MOD --> MONGO : pymongo
+PROJ_MOD --> DB_MOD
+TACHE_MOD --> DB_MOD
+MEMBRE_MOD --> DB_MOD
+USER_MOD --> DB_MOD
+AGG --> MONGO : pipelines $lookup\n$group $facet
+
+' ── Dépendances internes ──────────────────────────────────────────────
+PROJ_C --> UTILS
+TACHE_C --> UTILS
+MEMBRE_C --> UTILS
+STATS_C --> UTILS
+RECH_C --> UTILS
+
+' ── Contrôle d'accès ──────────────────────────────────────────────────
+FL --> UTILS : current_user\nrôle admin/chef/membre
+FL -[hidden]-> JSON_P
+
+note right of UTILS
+  Filtres automatiques selon rôle :
+  admin → accès total
+  chef_projet → ses projets uniquement
+  membre → ses tâches uniquement
+end note
+
+note bottom of AGG
+  6 pipelines MongoDB :
+  $match → $lookup → $group → $project → $sort
+  Utilisés par dashboard, stats et exports
+end note
+
+@enduml

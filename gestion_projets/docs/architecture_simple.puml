@@ -1,0 +1,81 @@
+@startuml Architecture_Simple
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 14
+skinparam ArrowColor #444444
+skinparam componentStyle rectangle
+
+title Gestion de Projets — Architecture MVC
+
+actor "Utilisateur" as U
+
+package "Flask" {
+    package "Controllers (Blueprints)" {
+        component "auth" as A
+        component "dashboard" as D
+        component "projets" as P
+        component "taches" as T
+        component "membres" as M
+        component "stats" as S
+        component "exports" as E
+        component "recherche" as R
+    }
+
+    package "Models" {
+        component "projet.py" as PM
+        component "tache.py" as TM
+        component "membre.py" as MM
+        component "user.py" as UM
+        component "aggregations.py" as AGG
+    }
+
+    package "Templates (Jinja2)" {
+        component "Pages HTML\n(Bootstrap 5 + Chart.js)" as HTML
+    }
+}
+
+database "MongoDB\ngestion_projets" as DB
+
+U --> A : login
+U --> D : GET /
+U --> P : /projets
+U --> T : /taches
+U --> M : /membres
+U --> S : /stats
+U --> E : /export/*.csv
+U --> R : /recherche
+
+D --> AGG
+S --> AGG
+E --> AGG
+
+P --> PM
+T --> TM
+M --> MM
+A --> UM
+
+PM --> DB
+TM --> DB
+MM --> DB
+UM --> DB
+AGG --> DB : pipelines\n$lookup · $group
+
+D --> HTML
+P --> HTML
+T --> HTML
+M --> HTML
+S --> HTML
+R --> HTML
+A --> HTML
+
+note bottom of AGG
+  6 pipelines :
+  avancement · retards · charge
+  durée · top membres · retard moyen
+end note
+
+note right of DB
+  4 collections + 4 vues
+end note
+
+@enduml

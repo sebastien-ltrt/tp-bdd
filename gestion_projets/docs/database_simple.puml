@@ -1,0 +1,106 @@
+@startuml Database_Simple
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #888888
+skinparam ArrowColor #444444
+skinparam defaultFontSize 14
+skinparam classAttributeIconSize 0
+
+title Schéma Base de Données — MongoDB gestion_projets
+
+' ── Collections ──────────────────────────────────────────────────────
+
+class "members" << Collection >> {
+  _id : ObjectId
+  --
+  nom, prenom
+  email  [unique]
+  role   [developpeur | designer | ...]
+  competences : String[]
+  date_embauche : Date
+}
+
+class "projects" << Collection >> {
+  _id : ObjectId
+  --
+  nom, description
+  date_debut, date_fin_prevue
+  statut  [planifie | en_cours | termine ...]
+  budget : Double
+  chef_projet_id : ObjectId  <<FK>>
+}
+
+class "tasks" << Collection >> {
+  _id : ObjectId
+  --
+  titre, description
+  projet_id : ObjectId   <<FK>>
+  assignee_id : ObjectId <<FK>>
+  statut    [todo | in_progress | done | blocked]
+  priorite  [low | medium | high | critical]
+  date_debut, date_echeance
+  temps_estime_heures, temps_reel_heures
+}
+
+class "users" << Collection >> {
+  _id : ObjectId
+  --
+  username  [unique]
+  password_hash
+  app_role  [admin | chef_projet | membre]
+  member_id : ObjectId  <<FK>>
+  is_active : Boolean
+}
+
+' ── Vues ─────────────────────────────────────────────────────────────
+
+class "vue_taches_en_retard" << Vue >> {
+  statut != done
+  date_echeance < NOW
+  --
+  + jours_retard
+  + nom_projet
+  + assignee_nom
+}
+
+class "vue_avancement_projets" << Vue >> {
+  groupé par projet
+  --
+  + total_taches
+  + % avancement
+  + heures estimées / réelles
+}
+
+class "vue_charge_membres" << Vue >> {
+  groupé par membre
+  --
+  + nb_taches_actives
+  + heures_estimees_total
+}
+
+class "vue_dashboard" << Vue >> {
+  $facet (multi-pipeline)
+  --
+  + KPIs globaux
+}
+
+' ── Relations ────────────────────────────────────────────────────────
+
+members "1" <--o "0..*" projects : chef_projet_id
+members "1" <--o "0..*" tasks    : assignee_id
+projects "1" <--o "0..*" tasks   : projet_id
+members "0..1" <--o "0..*" users : member_id
+
+tasks ..> "vue_taches_en_retard"
+tasks ..> "vue_avancement_projets"
+tasks ..> "vue_charge_membres"
+tasks ..> "vue_dashboard"
+
+note as N1
+  Choix : référencement (pas d'imbrication)
+  car 50+ tâches par projet
+  → requêtes transversales via $lookup
+end note
+
+@enduml
