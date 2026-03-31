@@ -85,6 +85,88 @@
     </div>
 </div>
 
+<!-- Diagramme de Gantt -->
+{% if taches %}
+<div class="section-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-bar-chart-steps text-info me-2"></i>Diagramme de Gantt</h5>
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <!-- Presets -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" data-gantt-preset="1m">1 mois</button>
+                <button class="btn btn-outline-secondary" data-gantt-preset="3m">3 mois</button>
+                <button class="btn btn-outline-secondary" data-gantt-preset="6m">6 mois</button>
+                <button class="btn btn-outline-secondary" data-gantt-preset="1y">1 an</button>
+                <button class="btn btn-outline-primary"   data-gantt-preset="all">Tout</button>
+            </div>
+            <!-- Zoom -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" id="ganttZoomIn"  title="Zoom +"><i class="bi bi-zoom-in"></i></button>
+                <button class="btn btn-outline-secondary" id="ganttZoomOut" title="Zoom −"><i class="bi bi-zoom-out"></i></button>
+            </div>
+            <!-- Plage personnalisée -->
+            <div class="d-flex align-items-center gap-1" style="font-size:0.8rem;">
+                <input type="date" id="ganttRangeStart" class="form-control form-control-sm" style="width:130px;">
+                <span class="text-muted">→</span>
+                <input type="date" id="ganttRangeEnd"   class="form-control form-control-sm" style="width:130px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Légende -->
+    <div class="d-flex flex-wrap gap-3 mb-2" style="font-size:0.78rem;color:#475569;">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#22c55e;vertical-align:middle;margin-right:4px;"></span>Terminé</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>En cours</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#94a3b8;vertical-align:middle;margin-right:4px;"></span>À faire</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef4444;vertical-align:middle;margin-right:4px;"></span>Bloqué</span>
+        <span><span style="display:inline-block;width:2px;height:10px;background:#f97316;vertical-align:middle;margin-right:4px;"></span>Aujourd'hui</span>
+        <span class="text-muted ms-2"><i class="bi bi-cursor"></i> Survolez ou cliquez sur une tâche</span>
+    </div>
+
+    <div style="position:relative;">
+        <canvas id="ganttCanvas" style="display:block;border-radius:8px;border:1px solid #e2e8f0;"></canvas>
+    </div>
+</div>
+
+<!-- Données Gantt (JSON, non exécuté comme JS) -->
+{% if taches %}
+<script type="application/json" id="ganttData">[
+    {% for t in taches %}
+    {
+        "id":       {{ t._id | string | tojson }},
+        "titre":    {{ t.titre | tojson }},
+        "statut":   {{ t.statut | tojson }},
+        "priorite": {{ t.priorite | tojson }},
+        "assignee": {{ t.assignee_nom | tojson }},
+        "h_est":    {{ t.temps_estime_heures or 0 }},
+        "h_reel":   {{ t.temps_reel_heures or 0 }},
+        "desc":     {{ (t.description or '') | tojson }},
+        "start":    {% if t.date_debut or projet.date_debut %}{{ ((t.date_debut or projet.date_debut).timestamp() * 1000) | int }}{% else %}null{% endif %},
+        "end":      {% if t.date_echeance %}{{ (t.date_echeance.timestamp() * 1000) | int }}{% else %}null{% endif %},
+        "url":      {{ url_for('taches.detail', id=t._id) | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+]</script>
+{% endif %}
+
+<!-- Tooltip Gantt -->
+<div id="ganttTooltip" style="
+    display:none;
+    position:absolute;
+    z-index:9999;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    padding:12px 14px;
+    min-width:220px;
+    max-width:280px;
+    pointer-events:none;
+    font-family:'Segoe UI',system-ui,sans-serif;
+    line-height:1.5;
+"></div>
+{% endif %}
+
 <!-- Liste des tâches -->
 <div class="section-card">
     <h5><i class="bi bi-list-check text-primary"></i> Tâches du projet</h5>
@@ -171,7 +253,353 @@
 
 {% block scripts %}
 <script>
-    // Variable pour le template Jinja
-    const now = new Date();
+const now = new Date();
+
+(function () {
+    const dataEl = document.getElementById("ganttData");
+    if (!dataEl) return;
+
+// ── Données (lues depuis le bloc JSON) ────────────────────────────────────────
+const raw   = JSON.parse(dataEl.textContent);
+const tasks = raw
+    .map(t => ({ ...t, start: new Date(t.start), end: new Date(t.end) }))
+    .filter(t => !isNaN(t.start) && !isNaN(t.end));
+
+if (tasks.length === 0) return;
+
+// ── Constantes ───────────────────────────────────────────────────────────────
+const COLORS = {
+    done:        "#22c55e",
+    in_progress: "#3b82f6",
+    todo:        "#94a3b8",
+    blocked:     "#ef4444",
+};
+const COLORS_HOV = {
+    done:        "#16a34a",
+    in_progress: "#1d4ed8",
+    todo:        "#475569",
+    blocked:     "#dc2626",
+};
+const STAT_LBL  = { done:"Terminé", in_progress:"En cours", todo:"À faire", blocked:"Bloqué" };
+const PRIO_LBL  = { low:"Basse", medium:"Moyenne", high:"Haute", critical:"Critique" };
+const PRIO_COL  = { low:"#22c55e", medium:"#f59e0b", high:"#f97316", critical:"#ef4444" };
+
+const ROW_H    = 34;
+const LABEL_W  = 200;
+const HEADER_H = 40;
+const MIN_BAR  = 4;
+
+// ── Etat de la vue ────────────────────────────────────────────────────────────
+const allMin0 = new Date(Math.min(...tasks.map(t => t.start)));
+const allMax0 = new Date(Math.max(...tasks.map(t => t.end)));
+const pad     = (allMax0 - allMin0) * 0.03 || 86400000 * 3;
+const allMin  = new Date(allMin0 - pad);
+const allMax  = new Date(allMax0 + pad);
+
+let viewStart  = new Date(allMin0);
+let viewEnd    = new Date(allMax0);
+let hoveredIdx = -1;
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+const canvas  = document.getElementById("ganttCanvas");
+const totalH  = HEADER_H + tasks.length * ROW_H + 12;
+canvas.height = totalH;
+const ctx     = canvas.getContext("2d");
+
+// ── Inputs ────────────────────────────────────────────────────────────────────
+const inStart = document.getElementById("ganttRangeStart");
+const inEnd   = document.getElementById("ganttRangeEnd");
+
+function toISO(d) { return isNaN(d) ? '' : d.toISOString().slice(0, 10); }
+function syncInputs() { inStart.value = toISO(viewStart); inEnd.value = toISO(viewEnd); }
+syncInputs();
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function xOf(date, spanMs, chartW) {
+    return LABEL_W + ((date - viewStart) / spanMs) * chartW;
+}
+function roundedRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x,     y + h, x,     y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y,         x + r, y);
+    ctx.closePath();
+}
+function truncate(ctx, text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    while (text.length > 1 && ctx.measureText(text + "…").width > maxW)
+        text = text.slice(0, -1);
+    return text + "…";
+}
+
+// ── Rendu ──────────────────────────────────────────────────────────────────────
+function render() {
+    const totalW = Math.max(canvas.parentElement.clientWidth - 2, 600);
+    canvas.width = totalW;
+    const chartW = totalW - LABEL_W;
+    const spanMs = viewEnd - viewStart;
+
+    function x(d) { return xOf(d, spanMs, chartW); }
+
+    // Fond
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // Lignes zébrées
+    tasks.forEach((_, i) => {
+        ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#ffffff";
+        ctx.fillRect(0, HEADER_H + i * ROW_H, totalW, ROW_H);
+    });
+
+    // Surlignage hover
+    if (hoveredIdx >= 0) {
+        ctx.fillStyle = "rgba(59,130,246,0.08)";
+        ctx.fillRect(0, HEADER_H + hoveredIdx * ROW_H, totalW, ROW_H);
+    }
+
+    // Graduations temporelles
+    const spanDays = spanMs / 86400000;
+    let tickStart, tickStep, tickLabel;
+    if (spanDays <= 30) {
+        tickStart = new Date(viewStart.getFullYear(), viewStart.getMonth(), viewStart.getDate());
+        tickStep  = d => d.setDate(d.getDate() + 1);
+        tickLabel = d => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    } else if (spanDays <= 120) {
+        tickStart = new Date(viewStart.getFullYear(), viewStart.getMonth(), 1);
+        tickStep  = d => d.setDate(d.getDate() + 7);
+        tickLabel = d => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    } else if (spanDays <= 730) {
+        tickStart = new Date(viewStart.getFullYear(), viewStart.getMonth(), 1);
+        tickStep  = d => d.setMonth(d.getMonth() + 1);
+        tickLabel = d => d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+    } else {
+        const qm  = Math.floor(viewStart.getMonth() / 3) * 3;
+        tickStart = new Date(viewStart.getFullYear(), qm, 1);
+        tickStep  = d => d.setMonth(d.getMonth() + 3);
+        tickLabel = d => `T${Math.floor(d.getMonth()/3)+1} ${d.getFullYear()}`;
+    }
+
+    ctx.strokeStyle  = "#e2e8f0";
+    ctx.lineWidth    = 1;
+    ctx.setLineDash([]);
+    ctx.fillStyle    = "#64748b";
+    ctx.font         = "11px 'Segoe UI',system-ui,sans-serif";
+    ctx.textAlign    = "center";
+    ctx.textBaseline = "middle";
+
+    const tick = new Date(tickStart);
+    while (tick <= viewEnd) {
+        const px = x(tick);
+        if (px > LABEL_W && px < totalW) {
+            ctx.beginPath(); ctx.moveTo(px, HEADER_H); ctx.lineTo(px, totalH); ctx.stroke();
+            ctx.fillText(tickLabel(new Date(tick)), px, HEADER_H / 2);
+        }
+        tickStep(tick);
+    }
+
+    // Ligne aujourd'hui
+    if (now >= viewStart && now <= viewEnd) {
+        const xn = x(now);
+        ctx.save();
+        ctx.strokeStyle = "#f97316"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+        ctx.beginPath(); ctx.moveTo(xn, HEADER_H); ctx.lineTo(xn, totalH); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#f97316";
+        ctx.font = "bold 10px 'Segoe UI',system-ui,sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("Auj.", xn, HEADER_H / 2 + 12);
+        ctx.restore();
+    }
+
+    // Barres tâches
+    tasks.forEach((t, i) => {
+        const hov   = i === hoveredIdx;
+        const color = hov ? (COLORS_HOV[t.statut] || "#475569") : (COLORS[t.statut] || "#94a3b8");
+        const rowY  = HEADER_H + i * ROW_H;
+        const barY  = rowY + 6;
+        const barH  = ROW_H - 12;
+
+        const xS = x(t.start);
+        const xE = x(t.end);
+        const cS = Math.max(xS, LABEL_W);
+        const cE = Math.min(xE, totalW - 2);
+        const bW = Math.max(cE - cS, MIN_BAR);
+
+        // Clip zone graphique
+        ctx.save();
+        ctx.beginPath(); ctx.rect(LABEL_W, HEADER_H, chartW, totalH); ctx.clip();
+
+        if (hov) { ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2; }
+        ctx.fillStyle = color;
+        roundedRect(ctx, cS, barY, bW, barH, 4);
+        ctx.fill();
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+        if (hov) { ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 1.5; ctx.stroke(); }
+
+        // Texte dans la barre
+        if (bW > 50) {
+            ctx.fillStyle = "#fff";
+            ctx.font = `${hov ? "bold " : ""}11px 'Segoe UI',system-ui,sans-serif`;
+            ctx.textAlign = "left"; ctx.textBaseline = "middle";
+            ctx.fillText(truncate(ctx, t.titre, bW - 14), cS + 7, barY + barH / 2);
+        }
+        ctx.restore();
+
+        // Label colonne gauche
+        ctx.fillStyle    = hov ? "#1d4ed8" : "#1e293b";
+        ctx.font         = `${hov ? "bold " : ""}12px 'Segoe UI',system-ui,sans-serif`;
+        ctx.textAlign    = "left"; ctx.textBaseline = "middle";
+        const lbl = truncate(ctx, t.titre, LABEL_W - 16);
+        ctx.fillText(lbl, 8, rowY + ROW_H / 2);
+
+        if (hov) {
+            ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 1; ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(8, rowY + ROW_H / 2 + 8);
+            ctx.lineTo(8 + ctx.measureText(lbl).width, rowY + ROW_H / 2 + 8);
+            ctx.stroke();
+        }
+    });
+
+    // Séparateur vertical
+    ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(LABEL_W, 0); ctx.lineTo(LABEL_W, totalH); ctx.stroke();
+
+    // En-tête : fond uniquement sur la colonne gauche (la zone graphique reste transparente pour les dates)
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(0, 0, LABEL_W, HEADER_H);
+    ctx.fillStyle = "#475569";
+    ctx.font = "bold 11px 'Segoe UI',system-ui,sans-serif";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText("Tâche", 8, HEADER_H / 2);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.beginPath(); ctx.moveTo(0, HEADER_H); ctx.lineTo(totalW, HEADER_H); ctx.stroke();
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById("ganttTooltip");
+
+function showTooltip(t, cx, cy) {
+    const rect = canvas.getBoundingClientRect();
+    const pcolor = PRIO_COL[t.priorite] || "#94a3b8";
+    const dur    = Math.round((t.end - t.start) / 86400000);
+    const late   = t.statut !== "done" && t.end < now;
+    tooltip.innerHTML = `
+        <div style="font-weight:700;font-size:13px;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid #f1f5f9;line-height:1.3;">${t.titre}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;">
+            <span style="color:#94a3b8;">Statut</span>
+            <span>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[t.statut]};margin-right:5px;"></span>
+                ${STAT_LBL[t.statut] || t.statut}
+                ${late ? '<span style="color:#ef4444;margin-left:4px;font-size:11px;">⚠ retard</span>' : ''}
+            </span>
+            <span style="color:#94a3b8;">Priorité</span>
+            <span style="color:${pcolor};font-weight:600;">${PRIO_LBL[t.priorite] || t.priorite}</span>
+            <span style="color:#94a3b8;">Assigné</span>
+            <span>${t.assignee}</span>
+            <span style="color:#94a3b8;">Début</span>
+            <span>${t.start.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</span>
+            <span style="color:#94a3b8;">Échéance</span>
+            <span>${t.end.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</span>
+            <span style="color:#94a3b8;">Durée</span>
+            <span>${dur} jour${dur>1?"s":""}</span>
+            <span style="color:#94a3b8;">Heures</span>
+            <span>${t.h_reel||"—"} / ${t.h_est}h estimées</span>
+        </div>
+        <div style="margin-top:9px;padding-top:7px;border-top:1px solid #f1f5f9;font-size:11px;color:#3b82f6;">
+            <i style="margin-right:4px;">↗</i> Cliquer pour ouvrir la tâche
+        </div>`;
+
+    tooltip.style.display = "block";
+    const tw = 250;
+    const absX = rect.left + cx + window.scrollX;
+    const absY = rect.top  + cy + window.scrollY;
+    let left = absX + 16;
+    if (left + tw > window.scrollX + window.innerWidth - 16) left = absX - tw - 10;
+    tooltip.style.left = left + "px";
+    tooltip.style.top  = (absY - 10) + "px";
+}
+function hideTooltip() { tooltip.style.display = "none"; }
+
+// ── Détection tâche sous le curseur ───────────────────────────────────────────
+function taskAt(mx, my) {
+    if (my < HEADER_H) return -1;
+    const i = Math.floor((my - HEADER_H) / ROW_H);
+    return (i >= 0 && i < tasks.length) ? i : -1;
+}
+
+// ── Événements souris ─────────────────────────────────────────────────────────
+canvas.addEventListener("mousemove", e => {
+    const r  = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    const idx = taskAt(mx, my);
+    if (idx !== hoveredIdx) { hoveredIdx = idx; render(); }
+    if (idx >= 0) { canvas.style.cursor = "pointer"; showTooltip(tasks[idx], mx, my); }
+    else          { canvas.style.cursor = "default";  hideTooltip(); }
+});
+canvas.addEventListener("mouseleave", () => {
+    if (hoveredIdx !== -1) { hoveredIdx = -1; render(); }
+    hideTooltip();
+    canvas.style.cursor = "default";
+});
+canvas.addEventListener("click", e => {
+    const r  = canvas.getBoundingClientRect();
+    const idx = taskAt(e.clientX - r.left, e.clientY - r.top);
+    if (idx >= 0) window.location.href = tasks[idx].url;
+});
+
+// ── Contrôles de plage ────────────────────────────────────────────────────────
+inStart.addEventListener("change", () => {
+    const d = new Date(inStart.value);
+    if (!isNaN(d) && d < viewEnd) { viewStart = d; render(); }
+});
+inEnd.addEventListener("change", () => {
+    const d = new Date(inEnd.value);
+    if (!isNaN(d) && d > viewStart) { viewEnd = d; render(); }
+});
+
+document.querySelectorAll("[data-gantt-preset]").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const p = btn.dataset.ganttPreset;
+        if (p === "all") {
+            viewStart = new Date(allMin0); viewEnd = new Date(allMax0);
+        } else {
+            const s = new Date(allMin0);
+            const months = { "1m": 1, "3m": 3, "6m": 6, "1y": 12 };
+            const m = months[p] || 3;
+            viewStart = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+            viewEnd   = new Date(s.getFullYear(), s.getMonth() + m, s.getDate());
+        }
+        syncInputs(); render();
+    });
+});
+
+document.getElementById("ganttZoomIn").addEventListener("click", () => {
+    const mid = (viewStart.getTime() + viewEnd.getTime()) / 2;
+    const h   = (viewEnd - viewStart) / 4;
+    viewStart = new Date(mid - h); viewEnd = new Date(mid + h);
+    syncInputs(); render();
+});
+document.getElementById("ganttZoomOut").addEventListener("click", () => {
+    const mid = (viewStart.getTime() + viewEnd.getTime()) / 2;
+    const h   = (viewEnd - viewStart);
+    viewStart = new Date(mid - h); viewEnd = new Date(mid + h);
+    syncInputs(); render();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+window.addEventListener("resize", render);
+
+})();
 </script>
 {% endblock %}
