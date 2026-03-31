@@ -14,6 +14,11 @@
 <!-- Filtres et tri -->
 <div class="section-card mb-4">
     <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Rechercher</label>
+            <input type="text" name="q" class="form-control form-control-sm"
+                   placeholder="Nom ou description…" value="{{ q or '' }}">
+        </div>
         <div class="col-auto">
             <label class="form-label small fw-semibold">Statut</label>
             <select name="statut" class="form-select form-select-sm">

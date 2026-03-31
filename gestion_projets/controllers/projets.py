@@ -32,6 +32,7 @@ _SORT_MAP = {
 def liste():
     proj_filter = get_projet_filter()
     filtre_statut = request.args.get("statut")
+    q     = request.args.get("q", "").strip()
     tri   = request.args.get("tri", "date_debut")
     ordre = request.args.get("ordre", "desc")
     ordre_val = -1 if ordre == "desc" else 1
@@ -39,11 +40,17 @@ def liste():
     if filtre_statut:
         proj_filter["statut"] = filtre_statut
 
+    if q:
+        proj_filter["$or"] = [
+            {"nom": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+        ]
+
     sort_stage = _SORT_MAP.get(tri, _SORT_MAP["date_debut"])(ordre_val)
     projets = ProjetModel.liste(proj_filter, sort_stage)
 
     return render_template("projets/liste.html", projets=projets,
-                           filtre_statut=filtre_statut, tri=tri, ordre=ordre,
+                           filtre_statut=filtre_statut, q=q, tri=tri, ordre=ordre,
                            statuts_projet=STATUTS)
 
 

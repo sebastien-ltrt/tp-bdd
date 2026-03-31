@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(head -50 /d/tp-bdd/gestion_projets/templates/*.html)",
-      "Bash(wc -l /d/tp-bdd/gestion_projets/templates/*.html /d/tp-bdd/gestion_projets/templates/**/*.html)",
-      "Bash(pip install:*)"
-    ]
-  }
-}
